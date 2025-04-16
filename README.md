@@ -1,1 +1,1 @@
-# Telemar-NETWORK
+Este projeto é batizado de Telemar-Network como homenagem à engenharia de redes que, mesmo com limitações severas, conectou pessoas e possibilitou o acesso à informação em tempos difíceis. Aqui, buscamos entender e recriar, em ambiente controlado, os desafios que moldaram as soluções modernas.
