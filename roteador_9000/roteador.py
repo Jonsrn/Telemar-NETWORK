@@ -1,9 +1,118 @@
+
 import socket
 import threading
 import json
 import networkx as nx
+import time 
+import matplotlib.pyplot as plt
 
-# === Carrega a topologia global da rede ===
+
+#Temporário, apenas pra imprimir o grafo da rede. 
+def salvar_grafo(grafo_dinamico, porta_lan):
+    time.sleep(60)  # espera a rede se estabilizar
+
+    plt.figure(figsize=(6, 5))
+    pos = nx.spring_layout(grafo_dinamico, seed=42)  # disposição dos nós
+    nx.draw(grafo_dinamico, pos, with_labels=True, node_color='skyblue', node_size=1200, font_size=10, font_weight='bold', edge_color='gray')
+    plt.title(f"Topologia vista pelo roteador {porta_lan}")
+    plt.savefig(f"grafo_{porta_lan}.png")
+    plt.close()
+    print(f"[LOG] Grafo salvo como grafo_{porta_lan}.png")
+
+def iniciar_lsa_protocol(minha_porta, interfaces_wan, grafo_dinamico):
+    def ciclo_periodico():
+        while True:
+            enviar_lsa(minha_porta, interfaces_wan, grafo_dinamico)
+            time.sleep(10)  # Intervalo entre LSAs (ajustável)
+
+    threading.Thread(target=ciclo_periodico, daemon=True).start()
+
+
+def iniciar_hello_protocol(porta_lan, interfaces_wan, grafo_dinamico):
+    """
+    Inicia uma thread que periodicamente envia mensagens HELLO
+    e escuta por respostas para construir dinamicamente o grafo da topologia.
+    """
+    def enviar_hellos():
+        while True:
+            for minha_porta, vizinhos in interfaces_wan.items():
+                for vizinho in vizinhos:
+                    mensagem = {
+                        "tipo": "hello",
+                        "origem": minha_porta
+                    }
+                    try:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sock.sendto(json.dumps(mensagem).encode(), ("127.0.0.1", vizinho))
+                        sock.close()
+                    except Exception as e:
+                        pass  # Falha ao enviar hello (vizinho pode estar off)
+            time.sleep(3)
+
+    # Threads paralelas para envio e escuta
+    threading.Thread(target=enviar_hellos, daemon=True).start()
+
+lsas_vistos = set()
+seq_lsa = 0  # incrementado a cada novo envio
+
+def enviar_lsa(minha_porta, interfaces_wan, grafo_dinamico):
+    global seq_lsa
+
+    vizinhos = list(grafo_dinamico.neighbors(minha_porta))
+    mensagem = {
+        "tipo": "lsa",
+        "origem": minha_porta,
+        "vizinhos": vizinhos,
+        "seq": seq_lsa
+    }
+
+    seq_lsa += 1
+    lsas_vistos.add((minha_porta, mensagem["seq"]))
+
+    for porta_iface, vizinhos_iface in interfaces_wan.items():
+        for vizinho in vizinhos_iface:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.sendto(json.dumps(mensagem).encode(), ("127.0.0.1", vizinho))
+                sock.close()
+            except:
+                continue
+
+
+#Cuida de Processar os LSAs recebidos dos vizinhos
+def processar_lsa(pacote, porta_origem, grafo_dinamico):
+    origem = pacote["origem"]
+    vizinhos = pacote["vizinhos"]
+    seq = pacote["seq"]
+
+    if (origem, seq) in lsas_vistos:
+        return  # já visto, ignora
+
+    lsas_vistos.add((origem, seq))
+
+    # atualiza o grafo
+    for vizinho in vizinhos:
+        if not grafo_dinamico.has_edge(origem, vizinho):
+            grafo_dinamico.add_edge(origem, vizinho, weight=1)
+            print(f"[LSA] Roteador {origem} ↔ {vizinho} adicionado")
+
+     # repassa para todos os vizinhos, exceto quem enviou (exceto se ele for o único)
+    for iface_local, vizinhos_iface in interfaces_wan.items():
+        for vizinho in vizinhos_iface:
+            if vizinho == porta_origem:
+                continue
+            try:
+                nova_mensagem = json.dumps(pacote).encode()
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.sendto(nova_mensagem, ("127.0.0.1", vizinho))
+                sock.close()
+            except:
+                continue
+
+  
+
+
+# === Carrega a topologia global da rede === Essa função vai sumir
 def carregar_topologia(nome_arquivo):
     with open(nome_arquivo, "r") as f:
         arestas = json.load(f)
@@ -31,15 +140,30 @@ def calcular_proximo_salto(grafo, origem, destino):
     return None
 
 # === Escuta em uma interface (porta específica) ===
-def escutar_interface(porta, sock, subrede_local, grafo, interfaces_wan, porta_lan):
+def escutar_interface(porta, sock, subrede_local, grafo_dinamico, interfaces_wan, porta_lan):
     print(f"[INTERFACE {porta}] Escutando...")
+    if not grafo_dinamico.has_node(porta):
+        grafo_dinamico.add_node(porta)
 
     while True:
         data, addr = sock.recvfrom(4096)
         try:
             # 1) Parse básico
             pacote = json.loads(data.decode())
-            tipo = pacote.get("tipo", "mensagem")  
+            tipo = pacote.get("tipo", "mensagem") 
+
+            if tipo == "lsa":
+                processar_lsa(pacote, porta, grafo_dinamico)
+                continue
+
+            # Trata mensagens HELLO diretamente no roteador (antes de acessar outros campos)
+            if tipo == "hello":
+                origem = int(pacote.get("origem"))
+                if not grafo_dinamico.has_edge(porta, origem):
+                    grafo_dinamico.add_edge(porta, origem, weight=1)
+                    print(f"[HELLO] Vizinho descoberto: {porta} ↔ {origem}")
+                continue
+
             destino_real = int(pacote.get("destino"))
             entrega_final = int(pacote.get("entrega_final", destino_real))
 
@@ -74,7 +198,7 @@ def escutar_interface(porta, sock, subrede_local, grafo, interfaces_wan, porta_l
                 continue
 
             # 5) Pacote vindo de uma WAN → calcula Dijkstra
-            proximo = calcular_proximo_salto(grafo, porta, destino_real)
+            proximo = calcular_proximo_salto(grafo_dinamico, porta, destino_real)
             if not proximo:
                 print(f"[INTERFACE {porta}] Sem rota para {destino_real}. Descartando.")
                 continue
@@ -91,6 +215,7 @@ def escutar_interface(porta, sock, subrede_local, grafo, interfaces_wan, porta_l
                 if proximo in vizinhos:
                     interface_envio = iface_local
                     break
+
 
             if interface_envio:
                 print(f"[INTERFACE {porta}] Encaminhando externamente para {destino_real} via iface {interface_envio} → {proximo}")
@@ -121,6 +246,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Erro ao ler config.json: {e}")
         exit(1)
+    
 
     porta_lan = int(config["porta_lan"])
     subrede_local = range(config["subrede_inicio"], config["subrede_fim"] + 1)
@@ -135,18 +261,42 @@ if __name__ == "__main__":
         sock.bind(("127.0.0.1", porta))
         sockets[porta] = sock
 
-    # === Carrega o grafo global ===
-    grafo = carregar_topologia("topologia.json")
+    # === Grafo dinâmico compartilhado (vai sendo construído com HELLO)
+    grafo_dinamico = nx.Graph()
+    grafo_dinamico.add_nodes_from(interfaces)       # já adiciona todos os nós locais
 
-    # === Inicia threads de escuta para cada interface ===
+    for i, a in enumerate(interfaces):
+        for b in interfaces[i+1:]:
+            grafo_dinamico.add_edge(a, b, weight=0)
+
+    # === Inicia protocolo HELLO
+    threading.Thread(
+        target=iniciar_hello_protocol,
+        args=(porta_lan, interfaces_wan, grafo_dinamico),
+        daemon=True
+    ).start()
+
+    # ✅ Inicia envio periódico de LSAs (🚀 adicione isso AQUI)
+    iniciar_lsa_protocol(porta_lan, interfaces_wan, grafo_dinamico)
+
+    # === Inicia threads de escuta para cada interface
     for porta in interfaces:
         t = threading.Thread(
             target=escutar_interface,
-            args=(porta, sockets[porta], subrede_local, grafo, interfaces_wan, porta_lan),
+            args=(porta, sockets[porta], subrede_local, grafo_dinamico, interfaces_wan, porta_lan),
             daemon=True
         )
-
         t.start()
+
+       
+    # === Salva imagem do grafo após 60 segundos
+    threading.Thread(
+        target=salvar_grafo,
+        args=(grafo_dinamico, porta_lan),
+        daemon=True
+    ).start()    
+
+    
 
     print(f"\n[Roteador iniciado] Interfaces ativas: {interfaces}")
     print(f"[LAN]: {porta_lan} — Subrede local: {subrede_local}")
