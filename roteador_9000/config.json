@@ -1,9 +1,0 @@
-{
-    "porta_lan": 9000,
-    "subrede_inicio": 9001,
-    "subrede_fim": 9009,
-    "interfaces_wan": {
-      "9011": [9031]
-    }
-  }
-  

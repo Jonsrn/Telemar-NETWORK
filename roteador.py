@@ -5,6 +5,7 @@ import json
 import networkx as nx
 import time 
 import matplotlib.pyplot as plt
+import argparse
 
 
 #Temporário, apenas pra imprimir o grafo da rede. 
@@ -240,17 +241,18 @@ if __name__ == "__main__":
     print("Inicialização do Roteador com múltiplas interfaces\n")
 
     # === Carrega config.json ===
-    try:
-        with open("config.json", "r") as f:
-            config = json.load(f)
-    except Exception as e:
-        print(f"❌ Erro ao ler config.json: {e}")
-        exit(1)
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--lan", type=int, required=True)
+    parser.add_argument("--inicio", type=int, required=True)
+    parser.add_argument("--fim", type=int, required=True)
+    parser.add_argument("--wan", type=str, required=True)  # JSON string
 
-    porta_lan = int(config["porta_lan"])
-    subrede_local = range(config["subrede_inicio"], config["subrede_fim"] + 1)
-    interfaces_wan = {int(k): v for k, v in config["interfaces_wan"].items()}
+    args = parser.parse_args()
+
+    porta_lan = args.lan
+    subrede_local = range(args.inicio, args.fim + 1)
+    interfaces_wan = json.loads(args.wan)
+    interfaces_wan = {int(k): v for k, v in interfaces_wan.items()}
 
     # === Cria sockets para todas as interfaces ===
     sockets = {}
@@ -288,13 +290,14 @@ if __name__ == "__main__":
         )
         t.start()
 
-       
+    '''   
     # === Salva imagem do grafo após 60 segundos
     threading.Thread(
         target=salvar_grafo,
         args=(grafo_dinamico, porta_lan),
         daemon=True
     ).start()    
+    '''
 
     
 
