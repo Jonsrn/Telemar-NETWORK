@@ -2,43 +2,39 @@ import subprocess
 import json
 import time
 
+# Roteadores com IPs e subredes específicas (tudo em 127.X.Y.Z)
 roteadores = [
     {
-        "porta_lan": 9000,
-        "subrede_inicio": 9001,
-        "subrede_fim": 9009,
-        "interfaces_wan": {
-            9011: [9031]
+        "meu_ip": "127.1.0.1",
+        "lan": ["127.1.0." + str(i) for i in range(10, 20)],
+        "wan": {
+            "127.1.0.1": ["127.2.0.1"]
         }
     },
     {
-        "porta_lan": 9020,
-        "subrede_inicio": 9021,
-        "subrede_fim": 9029,
-        "interfaces_wan": {
-            9031: [9011],
-            9030: [9051]
+        "meu_ip": "127.2.0.1",
+        "lan": ["127.2.0." + str(i) for i in range(10, 20)],
+        "wan": {
+            "127.2.0.1": ["127.1.0.1"], 
+            "127.2.1.1": ["127.3.0.1"]
         }
     },
     {
-        "porta_lan": 9040,
-        "subrede_inicio": 9041,
-        "subrede_fim": 9049,
-        "interfaces_wan": {
-            9051: [9030]
+        "meu_ip": "127.3.0.1",
+        "lan": ["127.3.0." + str(i) for i in range(10, 20)],
+        "wan": {
+            "127.3.0.1": ["127.2.0.1"]
         }
     }
 ]
 
 for rot in roteadores:
-    comando = [
-        "cmd", "/c", "start", "cmd", "/k",  # abre nova janela do CMD
+    cmd = [
+        "cmd", "/c", "start", "cmd", "/k",
         "python", "roteador.py",
-        "--lan", str(rot["porta_lan"]),
-        "--inicio", str(rot["subrede_inicio"]),
-        "--fim", str(rot["subrede_fim"]),
-        "--wan", json.dumps(rot["interfaces_wan"])
+        "--meu_ip", rot["meu_ip"],
+        "--lan", *rot["lan"],
+        "--wan", json.dumps(rot["wan"])
     ]
-
-    subprocess.Popen(comando)
-    time.sleep(0.5)  # pequeno delay pra evitar conflitos
+    subprocess.Popen(cmd)
+    time.sleep(0.5)  # atraso pequeno pra evitar colisão de sockets
