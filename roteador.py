@@ -153,8 +153,23 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                         continue
                     data = json.dumps(pacote).encode()
 
-                if entrega_final in subrede_local:
+                # Entrega local (para hosts ou para o próprio roteador)
+                if entrega_final in subrede_local or entrega_final == minha_iface:
                     print(f"[IF {minha_iface}] Entrega local → {entrega_final}")
+
+                    # Responde pings enviados ao próprio roteador
+                    if tipo == "ping" and entrega_final == minha_iface:
+                        resposta = {
+                            "tipo": "pong",
+                            "origem": minha_iface,
+                            "destino": pacote["origem"],
+                            "timestamp": pacote["timestamp"],
+                            "ttl": pacote.get("ttl", "?")
+                        }
+                        sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
+                        continue
+
+                    # Caso seja pra host na LAN
                     sock.sendto(data, (entrega_final, 5000))
                     continue
 
