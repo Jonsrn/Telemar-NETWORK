@@ -43,27 +43,33 @@ seq_lsa = 0
 
 def enviar_lsa(interfaces_wan, grafo_dinamico):
     global seq_lsa
+
     for iface_local in interfaces_wan.keys():
-        vizinhos_atuais = list(grafo_dinamico.neighbors(iface_local))
+        vizinhos_com_peso = {}
+
+        for vizinho in grafo_dinamico.neighbors(iface_local):
+            peso = grafo_dinamico[iface_local][vizinho].get("weight", 1)
+            vizinhos_com_peso[vizinho] = peso
 
         mensagem = {
             "tipo": "lsa",
             "origem": iface_local,
-            "vizinhos": vizinhos_atuais,
+            "vizinhos": vizinhos_com_peso,
             "seq": seq_lsa
         }
 
         seq_lsa += 1
         lsas_vistos.add((iface_local, mensagem["seq"]))
 
-        for vizinhos in interfaces_wan.values():
-            for viz in vizinhos:
+        for lista in interfaces_wan.values():
+            for viz in lista:
                 try:
                     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     s.sendto(json.dumps(mensagem).encode(), (viz, 5000))
                     s.close()
                 except:
                     continue
+
 
 
 def iniciar_lsa_protocol(interfaces_wan, grafo_dinamico):
@@ -80,7 +86,7 @@ topologia_local = {}
 # === Processamento de LSA recebido ===
 def processar_lsa(pacote, porta_origem, grafo_dinamico):
     origem = pacote["origem"]
-    vizinhos = set(pacote["vizinhos"])
+    vizinhos = pacote["vizinhos"]  # agora é um dicionário: {vizinho: peso}
     seq = pacote["seq"]
 
     if (origem, seq) in lsas_vistos:
@@ -88,36 +94,44 @@ def processar_lsa(pacote, porta_origem, grafo_dinamico):
 
     lsas_vistos.add((origem, seq))
 
-    # Se não houve mudança na topologia, ignora
-    if topologia_local.get(origem) == vizinhos:
+    # Se não houve mudança na topologia (estrutura e pesos), ignora
+    vizinhos_recebidos = set(vizinhos.keys())
+    vizinhos_atuais = topologia_local.get(origem, {})
+
+    if vizinhos_atuais == vizinhos:
         return
 
-    # Remove vizinhos antigos
-    vizinhos_atuais = topologia_local.get(origem, set())
-    for vizinho_antigo in vizinhos_atuais:
+    # Remove arestas antigas que não existem mais
+    for vizinho_antigo in set(vizinhos_atuais.keys()):
         if vizinho_antigo not in vizinhos and grafo_dinamico.has_edge(origem, vizinho_antigo):
             grafo_dinamico.remove_edge(origem, vizinho_antigo)
             print(f"[LSA] Roteador {origem} ↔ {vizinho_antigo} REMOVIDO")
 
-    # Adiciona vizinhos novos
-    for vizinho_novo in vizinhos:
+    # Adiciona ou atualiza as arestas recebidas
+    for vizinho_novo, peso in vizinhos.items():
         if not grafo_dinamico.has_edge(origem, vizinho_novo):
-            grafo_dinamico.add_edge(origem, vizinho_novo, weight=1)
-            print(f"[LSA] Roteador {origem} ↔ {vizinho_novo} ADICIONADO")
+            grafo_dinamico.add_edge(origem, vizinho_novo, weight=peso)
+            print(f"[LSA] Roteador {origem} ↔ {vizinho_novo} ADICIONADO (peso {peso})")
+        else:
+            peso_atual = grafo_dinamico[origem][vizinho_novo].get("weight", 1)
+            if peso != peso_atual:
+                grafo_dinamico[origem][vizinho_novo]["weight"] = peso
+                print(f"[LSA] Roteador {origem} ↔ {vizinho_novo} ATUALIZADO (peso {peso})")
 
-    # Atualiza o cache
+    # Atualiza cache local
     topologia_local[origem] = vizinhos
 
-    # Propaga o LSA modificado
-    for vizinhos_iface in interfaces_wan.values():
-        for vizinho in vizinhos_iface:
+    # Propaga o LSA para outros vizinhos
+    for lista in interfaces_wan.values():
+        for viz in lista:
             try:
                 nova_mensagem = json.dumps(pacote).encode()
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                sock.sendto(nova_mensagem, (vizinho, 5000))
+                sock.sendto(nova_mensagem, (viz, 5000))
                 sock.close()
             except:
                 continue
+
 
 
 # === Dijkstra ===
@@ -197,6 +211,55 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
             try:
                 pacote = json.loads(data.decode())
                 tipo = pacote.get("tipo", "mensagem")
+
+                if tipo == "cli_comando":
+                    comando = pacote.get("comando", "")
+                    destino_iface = pacote.get("destino")
+
+                    if destino_iface not in interfaces_wan:
+                        print(f"[CLI] Interface {destino_iface} não pertence ao roteador.")
+                        continue
+
+                    if comando.startswith("++++"):
+                        print(f"[CLI] Aumentando o peso de todas as interfaces WAN de {destino_iface}")
+                        for iface, vizinhos in interfaces_wan.items():
+                            for viz in vizinhos:
+                                if grafo_dinamico.has_edge(iface, viz):
+                                    peso_atual = grafo_dinamico[iface][viz].get("weight", 1)
+                                    novo_peso = min(peso_atual + 1, 20)  # limite arbitrário
+                                    grafo_dinamico[iface][viz]["weight"] = novo_peso
+                                    print(f"[CLI] Peso de {iface} ↔ {viz} alterado para {novo_peso}")
+
+                        enviar_lsa(interfaces_wan, grafo_dinamico)
+
+                    elif comando.startswith("++") or comando.startswith("--"):
+                        # Ex: ++3 ou --2
+                        operacao = comando[:2]
+                        try:
+                            idx = int(comando[2]) - 1  # Interface 1 é índice 0
+                            todas_ifaces = list(interfaces_wan.keys())
+                            if idx >= len(todas_ifaces):
+                                print(f"[CLI] Índice {idx+1} inválido. Este roteador possui {len(todas_ifaces)} interfaces WAN.")
+                                continue
+
+                            iface_alvo = todas_ifaces[idx]
+                            for viz in interfaces_wan[iface_alvo]:
+                                if grafo_dinamico.has_edge(iface_alvo, viz):
+                                    peso_atual = grafo_dinamico[iface_alvo][viz].get("weight", 1)
+                                    if operacao == "++":
+                                        novo_peso = min(peso_atual + 1, 20)
+                                    else:
+                                        novo_peso = max(peso_atual - 1, 1)
+                                    grafo_dinamico[iface_alvo][viz]["weight"] = novo_peso
+                                    print(f"[CLI] Peso de {iface_alvo} ↔ {viz} ajustado para {novo_peso}")
+
+                            enviar_lsa(interfaces_wan, grafo_dinamico)
+
+                        except ValueError:
+                            print("[CLI] Comando mal formatado.")
+                            continue
+
+                    continue
 
                 if tipo == "lsa":
                     processar_lsa(pacote, minha_iface, grafo_dinamico)
