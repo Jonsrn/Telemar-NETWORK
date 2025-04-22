@@ -212,54 +212,62 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                 pacote = json.loads(data.decode())
                 tipo = pacote.get("tipo", "mensagem")
 
-                if tipo == "cli_comando":
-                    comando = pacote.get("comando", "")
-                    destino_iface = pacote.get("destino")
+                
 
+                # ───── CLI remoto ────────────────────────────────────────────────────────────
+                if tipo == "cli_comando":
+                    comando       = pacote.get("comando", "").strip().lower()
+                    destino_iface = pacote.get("destino")          # pode vir None em “graph”
+                    ip_remetente  = addr[0]                        # quem pediu
+
+                    # 1) RECUPERA GRAFO -------------------------------------------------------
+                    if comando == "graph":
+                        # serializa todas as arestas (somente externas) com peso
+                        arestas = []
+                        for a, b, dados in grafo_dinamico.edges(data=True):
+                            peso = dados.get("weight", 1)
+                            arestas.append((a, b, peso))
+
+                        resposta = {
+                            "tipo": "cli_graph",
+                            "origem": minha_iface,   # qq interface local serve
+                            "arestas": arestas
+                        }
+                        sock.sendto(json.dumps(resposta).encode(), (ip_remetente, 5001))
+                        continue   # fim do comando graph
+                    # -------------------------------------------------------------------------
+
+                    # 2) COMANDOS DE PESO ------------------------------------------------------
                     if destino_iface not in interfaces_wan:
                         print(f"[CLI] Interface {destino_iface} não pertence ao roteador.")
                         continue
 
-                    if comando.startswith("++++"):
-                        print(f"[CLI] Aumentando o peso de todas as interfaces WAN de {destino_iface}")
+                    if comando == "++++":                        # todas as ifaces +1
                         for iface, vizinhos in interfaces_wan.items():
                             for viz in vizinhos:
                                 if grafo_dinamico.has_edge(iface, viz):
-                                    peso_atual = grafo_dinamico[iface][viz].get("weight", 1)
-                                    novo_peso = min(peso_atual + 1, 20)  # limite arbitrário
-                                    grafo_dinamico[iface][viz]["weight"] = novo_peso
-                                    print(f"[CLI] Peso de {iface} ↔ {viz} alterado para {novo_peso}")
-
+                                    w = grafo_dinamico[iface][viz].get("weight", 1)
+                                    grafo_dinamico[iface][viz]["weight"] = min(w+1, 20)
                         enviar_lsa(interfaces_wan, grafo_dinamico)
 
-                    elif comando.startswith("++") or comando.startswith("--"):
-                        # Ex: ++3 ou --2
-                        operacao = comando[:2]
+                    elif comando.startswith(("++", "--")):       # uma iface específica
+                        operacao = comando[:2]                   # '++' ou '--'
                         try:
-                            idx = int(comando[2]) - 1  # Interface 1 é índice 0
-                            todas_ifaces = list(interfaces_wan.keys())
-                            if idx >= len(todas_ifaces):
-                                print(f"[CLI] Índice {idx+1} inválido. Este roteador possui {len(todas_ifaces)} interfaces WAN.")
-                                continue
-
-                            iface_alvo = todas_ifaces[idx]
-                            for viz in interfaces_wan[iface_alvo]:
-                                if grafo_dinamico.has_edge(iface_alvo, viz):
-                                    peso_atual = grafo_dinamico[iface_alvo][viz].get("weight", 1)
-                                    if operacao == "++":
-                                        novo_peso = min(peso_atual + 1, 20)
-                                    else:
-                                        novo_peso = max(peso_atual - 1, 1)
-                                    grafo_dinamico[iface_alvo][viz]["weight"] = novo_peso
-                                    print(f"[CLI] Peso de {iface_alvo} ↔ {viz} ajustado para {novo_peso}")
-
-                            enviar_lsa(interfaces_wan, grafo_dinamico)
-
-                        except ValueError:
-                            print("[CLI] Comando mal formatado.")
+                            idx = int(comando[2]) - 1            # 1‑base → 0‑base
+                            iface_alvo = list(interfaces_wan)[idx]
+                        except (ValueError, IndexError):
+                            print("[CLI] Índice de interface inválido.")
                             continue
 
-                    continue
+                        for viz in interfaces_wan[iface_alvo]:
+                            if grafo_dinamico.has_edge(iface_alvo, viz):
+                                w = grafo_dinamico[iface_alvo][viz].get("weight", 1)
+                                grafo_dinamico[iface_alvo][viz]["weight"] = \
+                                    min(w+1, 20) if operacao == "++" else max(w-1, 1)
+                        enviar_lsa(interfaces_wan, grafo_dinamico)
+                    # -------------------------------------------------------------------------
+                    continue  # fim do cli_comando
+
 
                 elif tipo == "traceroute":
                     destino_final = pacote["entrega_final"]
