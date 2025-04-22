@@ -43,33 +43,28 @@ seq_lsa = 0
 
 def enviar_lsa(interfaces_wan, grafo_dinamico):
     global seq_lsa
-
-    todas_ifaces = list(interfaces_wan.keys())
-
-    for iface_local, vizinhos_externos in interfaces_wan.items():
-        vizinhos = set(vizinhos_externos)
-        for outra in todas_ifaces:
-            if outra != iface_local:
-                vizinhos.add(outra)
+    for iface_local in interfaces_wan.keys():
+        vizinhos_atuais = list(grafo_dinamico.neighbors(iface_local))
 
         mensagem = {
             "tipo": "lsa",
             "origem": iface_local,
-            "vizinhos": list(vizinhos),
+            "vizinhos": vizinhos_atuais,
             "seq": seq_lsa
         }
 
         seq_lsa += 1
         lsas_vistos.add((iface_local, mensagem["seq"]))
 
-        for lista in interfaces_wan.values():
-            for viz in lista:
+        for vizinhos in interfaces_wan.values():
+            for viz in vizinhos:
                 try:
                     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     s.sendto(json.dumps(mensagem).encode(), (viz, 5000))
                     s.close()
                 except:
-                    pass
+                    continue
+
 
 def iniciar_lsa_protocol(interfaces_wan, grafo_dinamico):
     def ciclo():
@@ -78,10 +73,14 @@ def iniciar_lsa_protocol(interfaces_wan, grafo_dinamico):
             time.sleep(10)
     threading.Thread(target=ciclo, daemon=True).start()
 
+
+# === Cache da topologia local
+topologia_local = {}
+
 # === Processamento de LSA recebido ===
 def processar_lsa(pacote, porta_origem, grafo_dinamico):
     origem = pacote["origem"]
-    vizinhos = pacote["vizinhos"]
+    vizinhos = set(pacote["vizinhos"])
     seq = pacote["seq"]
 
     if (origem, seq) in lsas_vistos:
@@ -89,11 +88,27 @@ def processar_lsa(pacote, porta_origem, grafo_dinamico):
 
     lsas_vistos.add((origem, seq))
 
-    for vizinho in vizinhos:
-        if not grafo_dinamico.has_edge(origem, vizinho):
-            grafo_dinamico.add_edge(origem, vizinho, weight=1)
-            print(f"[LSA] Roteador {origem} ↔ {vizinho} adicionado")
+    # Se não houve mudança na topologia, ignora
+    if topologia_local.get(origem) == vizinhos:
+        return
 
+    # Remove vizinhos antigos
+    vizinhos_atuais = topologia_local.get(origem, set())
+    for vizinho_antigo in vizinhos_atuais:
+        if vizinho_antigo not in vizinhos and grafo_dinamico.has_edge(origem, vizinho_antigo):
+            grafo_dinamico.remove_edge(origem, vizinho_antigo)
+            print(f"[LSA] Roteador {origem} ↔ {vizinho_antigo} REMOVIDO")
+
+    # Adiciona vizinhos novos
+    for vizinho_novo in vizinhos:
+        if not grafo_dinamico.has_edge(origem, vizinho_novo):
+            grafo_dinamico.add_edge(origem, vizinho_novo, weight=1)
+            print(f"[LSA] Roteador {origem} ↔ {vizinho_novo} ADICIONADO")
+
+    # Atualiza o cache
+    topologia_local[origem] = vizinhos
+
+    # Propaga o LSA modificado
     for vizinhos_iface in interfaces_wan.values():
         for vizinho in vizinhos_iface:
             try:
@@ -104,10 +119,10 @@ def processar_lsa(pacote, porta_origem, grafo_dinamico):
             except:
                 continue
 
+
 # === Dijkstra ===
 def calcular_proximo_salto(grafo, origem, destino):
     try:
-        print(f"[Dijkstra DEBUG] {origem} → {destino}")
         caminho = nx.shortest_path(grafo, source=origem, target=destino, weight="weight")
         print(f"[Dijkstra DEBUG] Caminho: {caminho}")
         if len(caminho) > 1:
@@ -116,6 +131,59 @@ def calcular_proximo_salto(grafo, origem, destino):
         print(f"[Dijkstra] Sem caminho de {origem} para {destino}")
         return None
     return None
+
+vizinhos_ativos = {}
+estado_vizinhos = {}  # chave: vizinho, valor: 'ativo' ou 'inativo'
+
+def monitorar_vizinhos(grafo_dinamico, interfaces_wan, interfaces_locais):
+    snapshot_local = set()
+
+    # Inicializar estado inicial dos vizinhos
+    for iface_local, vizinhos_iface in interfaces_wan.items():
+        for viz in vizinhos_iface:
+            estado_vizinhos[viz] = 'inativo'
+
+    while True:
+        agora = time.time()
+
+        # Monitorar cada interface WAN separadamente
+        for iface_local, vizinhos_iface in interfaces_wan.items():
+            for vizinho in vizinhos_iface:
+                ultimo_hello = vizinhos_ativos.get(vizinho, 0)
+                tempo_sem_hello = agora - ultimo_hello
+
+                if tempo_sem_hello > 10:
+                    # Vizinho caiu
+                    if estado_vizinhos[vizinho] != 'inativo':
+                        estado_vizinhos[vizinho] = 'inativo'
+                        if grafo_dinamico.has_edge(iface_local, vizinho):
+                            grafo_dinamico.remove_edge(iface_local, vizinho)
+                            print(f"[TIMEOUT] {iface_local} perdeu conexão com {vizinho}")
+                            enviar_lsa(interfaces_wan, grafo_dinamico)
+                else:
+                    # Vizinho ativo
+                    if estado_vizinhos[vizinho] != 'ativo':
+                        estado_vizinhos[vizinho] = 'ativo'
+                        if not grafo_dinamico.has_edge(iface_local, vizinho):
+                            grafo_dinamico.add_edge(iface_local, vizinho, weight=1)
+                            print(f"[RECOVERY] {iface_local} recuperou conexão com {vizinho}")
+                            enviar_lsa(interfaces_wan, grafo_dinamico)
+
+        # Snapshot atualizado das arestas para todas as interfaces locais
+        novo_snapshot = set()
+        for iface_local in interfaces_locais:
+            for vizinho in grafo_dinamico.neighbors(iface_local):
+                novo_snapshot.add(tuple(sorted((iface_local, vizinho))))
+
+        # Verifica se houve mudança global
+        if novo_snapshot != snapshot_local:
+            print(f"[LSA] Mudança detectada, snapshot atualizado: {novo_snapshot}")
+            snapshot_local = novo_snapshot
+            enviar_lsa(interfaces_wan, grafo_dinamico)
+
+        time.sleep(3)
+
+
 
 # === Escuta ===
 def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfaces_wan):
@@ -136,12 +204,31 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
 
                 if tipo == "hello":
                     origem = pacote.get("origem")
-                    if not grafo_dinamico.has_edge(minha_iface, origem):
+
+                    #print(f"[HELLO] Recebi HELLO de {origem} na interface {minha_iface}")
+
+                    # Atualiza o timestamp imediatamente
+                    vizinhos_ativos[origem] = time.time()
+
+                    # Se estava inativo, reativa e dispara LSA imediatamente
+                    if estado_vizinhos.get(origem) == 'inativo':
+                        estado_vizinhos[origem] = 'ativo'
+                        if not grafo_dinamico.has_edge(minha_iface, origem):
+                            grafo_dinamico.add_edge(minha_iface, origem, weight=1)
+                            print(f"[RECOVERY] Interface {minha_iface} reconectada com {origem}")
+                            enviar_lsa(interfaces_wan, grafo_dinamico)
+
+                    # Novo vizinho (primeira conexão)
+                    elif not grafo_dinamico.has_edge(minha_iface, origem):
                         grafo_dinamico.add_edge(minha_iface, origem, weight=1)
-                        print(f"[HELLO] Vizinho descoberto: {minha_iface} ↔ {origem}")
-                     # 🔧 ADICIONE ESTA LINHA AQUI:
+                        print(f"[NOVO] Novo vizinho conectado: {minha_iface} ↔ {origem}")
+                        enviar_lsa(interfaces_wan, grafo_dinamico)
+
+                    # Atualiza a interface de saída sempre
                     vizinho_para_iface[origem] = minha_iface
                     continue
+
+
                    
 
                 destino = pacote["destino"]
@@ -254,6 +341,13 @@ if __name__ == "__main__":
             daemon=True
         )
         t.start()
+
+    threading.Thread(
+    target=monitorar_vizinhos,
+    args=(grafo_dinamico, interfaces_wan, interfaces_locais),
+    daemon=True
+    ).start()
+    
     
     '''
     # === Salva imagem do grafo após 60 segundos
