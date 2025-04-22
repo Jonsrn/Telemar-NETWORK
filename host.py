@@ -37,17 +37,13 @@ def escutar(meu_ip):
                     print(f"Resposta de {pacote['origem']}: bytes=32 tempo={tempo_ida_volta}ms TTL={pacote.get('ttl', '?')}")
                     pings_ativos[ts]["latencia"] = tempo_ida_volta
 
-            elif tipo == "ttl_exceeded":
-                print(f"[HOST {meu_ip}] TTL excedido em {pacote['hop']}")
-
-            elif tipo == "traceroute_complete":
-                print(f"[HOST {meu_ip}] Traceroute finalizado: {pacote['hops']}")
 
             else:
                 print(f"[HOST {meu_ip}] Pacote desconhecido: {pacote}")
 
         except Exception as e:
             print(f"[HOST {meu_ip}] Pacote inválido ou erro: {e}")
+
 
 def realizar_ping(destino_ip, meu_ip, gateway_ip, sock):
     print(f"\nDisparando {destino_ip} com 32 bytes de dados:")
@@ -107,6 +103,50 @@ def realizar_ping(destino_ip, meu_ip, gateway_ip, sock):
         print("Aproximar um número redondo de vezes em milissegundos:")
         print(f"    Mínimo = {min(tempos)}ms, Máximo = {max(tempos)}ms, Média = {sum(tempos)//len(tempos)}ms")
 
+
+        
+def realizar_traceroute(destino_ip, meu_ip, gateway_ip, sock_lan):
+    max_saltos = 15
+    print(f"\nTRACEROUTE para {destino_ip} (máximo {max_saltos} saltos):")
+
+    # ➊ ─ socket dedicado para as respostas
+    tr_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    tr_sock.bind((meu_ip, 0))              # porta 0 => SO escolhe
+    reply_port = tr_sock.getsockname()[1]  # porta real escolhida
+
+    for ttl_atual in range(1, max_saltos + 1):
+        pacote = {
+            "tipo": "traceroute",
+            "origem": meu_ip,
+            "reply_port": reply_port,      # ➋ ─ roteadores usarão isso
+            "destino": gateway_ip,
+            "entrega_final": destino_ip,
+            "ttl": ttl_atual,
+            "numero": ttl_atual
+        }
+        sock_lan.sendto(json.dumps(pacote).encode(), (gateway_ip, 5000))
+
+        tr_sock.settimeout(2)              # aguarda resposta
+        try:
+            while True:
+                data, _ = tr_sock.recvfrom(4096)
+                resp = json.loads(data.decode())
+
+                if resp.get("numero") != ttl_atual:
+                    continue               # pacote antigo -> ignora
+
+                if resp["tipo"] == "ttl_exceeded":
+                    print(f"{ttl_atual}: salto → {resp['hop']}")
+                    break                  # passa p/ o próximo TTL
+                elif resp["tipo"] == "traceroute_reply":
+                    print(f"{ttl_atual}: destino alcançado → {resp['origem']}")
+                    tr_sock.close()
+                    return                 # encerra traceroute
+        except socket.timeout:
+            print(f"{ttl_atual}: * (tempo esgotado)")
+
+
+
 def enviar_loop(meu_ip, gateway_ip):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while True:
@@ -137,7 +177,10 @@ def enviar_loop(meu_ip, gateway_ip):
             realizar_ping(destino_ip, meu_ip, gateway_ip, sock)
 
         elif escolha == "3":
-            print("🔧 TRACEROUTE ainda não implementado.")
+            destino_ip = input("Destino final (IP): ")
+            realizar_traceroute(destino_ip, meu_ip, gateway_ip, sock)
+
+
 
         else:
             print("❌ Opção inválida.")

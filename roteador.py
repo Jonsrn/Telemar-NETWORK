@@ -261,6 +261,45 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
 
                     continue
 
+                elif tipo == "traceroute":
+                    destino_final = pacote["entrega_final"]
+                    # ▶ Quando o roteador é o destino final
+                    if destino_final == minha_iface:
+                        resposta = {
+                            "tipo": "traceroute_reply",
+                            "origem": minha_iface,
+                            "numero": pacote["numero"]
+                        }
+                        porta_dest = pacote.get("reply_port", 5000)   # idem
+                        sock.sendto(json.dumps(resposta).encode(),
+                                    (pacote["origem"], porta_dest))
+                        continue
+
+                    # ▶ Quando TTL chegar a 0  (resposta ttl_exceeded)
+                    pacote["ttl"] -= 1
+                    if pacote["ttl"] <= 0:
+                        resposta = {
+                            "tipo": "ttl_exceeded",
+                            "hop" : minha_iface,
+                            "numero": pacote["numero"]
+                        }
+                        porta_dest = pacote.get("reply_port", 5000)   # ➌ usa porta do host
+                        sock.sendto(json.dumps(resposta).encode(),
+                                    (pacote["origem"], porta_dest))
+                        continue
+
+                    # Segue encaminhando o traceroute normalmente
+                    dados = json.dumps(pacote).encode()
+
+                    partes = destino_final.split(".")
+                    gateway_destino = f"{partes[0]}.{partes[1]}.{partes[2]}.1"
+                    proximo = calcular_proximo_salto(grafo_dinamico, minha_iface, gateway_destino)
+                    if proximo:
+                        iface_saida = vizinho_para_iface.get(proximo, proximo)
+                        sockets[iface_saida].sendto(dados, (proximo, 5000))
+
+
+
                 if tipo == "lsa":
                     processar_lsa(pacote, minha_iface, grafo_dinamico)
                     continue
@@ -300,8 +339,15 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                 if "ttl" in pacote:
                     pacote["ttl"] -= 1
                     if pacote["ttl"] < 0:
+                        # Aqui falta disparar resposta pro HOST origem
+                        resposta = {
+                            "tipo": "ttl_exceeded",
+                            "origem": minha_iface,
+                            "destino": pacote["origem"],
+                            "hop": minha_iface  # quem respondeu o salto
+                        }
+                        sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
                         continue
-                    data = json.dumps(pacote).encode()
 
                 # Entrega local (para hosts ou para o próprio roteador)
                 if entrega_final in subrede_local or entrega_final == minha_iface:
