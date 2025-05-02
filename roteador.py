@@ -102,17 +102,6 @@ def salvar_grafo(grafo_dinamico, meu_ip, interfaces_locais):
     print(f"[CLI] Topologia salva como {nome}")
 
 
-def encontrar_iface_por_subrede(ip_destino, interfaces_locais):
-    partes_dest = ip_destino.split(".")
-    prefixo_dest = ".".join(partes_dest[:3])  # 127.X.Y
-
-    for iface in interfaces_locais:
-        partes_iface = iface.split(".")
-        prefixo_iface = ".".join(partes_iface[:3])
-        if prefixo_dest == prefixo_iface:
-            return iface
-    return None
-
 
 
 # === Protocolo HELLO ===
