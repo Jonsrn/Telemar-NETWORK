@@ -6,16 +6,72 @@ import time
 import matplotlib.pyplot as plt
 import argparse
 
+import math
+
 # Para salvar graficamente o grafo
 def salvar_grafo(grafo_dinamico, meu_ip):
-    time.sleep(60)
-    plt.figure(figsize=(6, 5))
-    pos = nx.spring_layout(grafo_dinamico, seed=42)
-    nx.draw(grafo_dinamico, pos, with_labels=True, node_color='skyblue', node_size=1200, font_size=10, font_weight='bold', edge_color='gray')
-    plt.title(f"Topologia vista pelo roteador {meu_ip}")
-    plt.savefig(f"grafo_{meu_ip.replace('.', '_')}.png")
+    import math, time
+    time.sleep(1)
+
+    # ── 1. agrupa portas por roteador ("127.X") ────────────────────────────
+    clusters = {}
+    for n in grafo_dinamico.nodes():
+        rid = '.'.join(n.split('.')[:2])          # exemplo: 127.3
+        clusters.setdefault(rid, []).append(n)
+
+    # ── 2. posiciona centros dos roteadores num anel grande ────────────────
+    N = len(clusters)
+    R_outer = 10
+    pos = {}
+    centers = {}                                 # guarda posição do "hub"
+
+    for k, (rid, ifaces) in enumerate(sorted(clusters.items())):
+        ang_c = 2 * math.pi * k / N
+        cx, cy = R_outer * math.cos(ang_c), R_outer * math.sin(ang_c)
+        centers[rid] = (cx, cy)
+
+        m = len(ifaces)
+        R_inner = 1.2 + 0.3 * m                  # raio interno cresce p/ + portas
+        for i, iface in enumerate(sorted(ifaces)):
+            ang = 2 * math.pi * i / m + ang_c    # gira de leve junto com cluster
+            pos[iface] = (cx + R_inner * math.cos(ang),
+                          cy + R_inner * math.sin(ang))
+
+    # ── 3. adiciona arestas internas p/ formar polígono /////////////////////
+    G = grafo_dinamico.copy()
+    for ifaces in clusters.values():
+        m = len(ifaces)
+        if m >= 3:
+            for i in range(m):
+                G.add_edge(ifaces[i], ifaces[(i+1)%m])
+        elif m == 2:
+            G.add_edge(ifaces[0], ifaces[1])
+        # m==1  -> não liga nada
+
+    # ── 4. desenha //////////////////////////////////////////////////////////
+    plt.figure(figsize=(11, 8))
+    nx.draw(G, pos,
+            with_labels=True,
+            node_color="skyblue",
+            node_size=1100,
+            edge_color="gray",
+            font_size=9,
+            font_weight="bold")
+
+    # hub visual no centro de cada roteador
+    xs, ys = zip(*centers.values())
+    plt.scatter(xs, ys, s=80, c="#888888")
+
+    plt.title(f"Topologia – roteador {meu_ip}")
+    plt.axis("off")
+    plt.tight_layout()
+
+    nome = f"grafo_{meu_ip.replace('.', '_')}.png"
+    plt.savefig(nome, dpi=150)
     plt.close()
-    print(f"[LOG] Grafo salvo como grafo_{meu_ip.replace('.', '_')}.png")
+    print(f"[CLI] Topologia salva como {nome}")
+
+
 
 # === Protocolo HELLO ===
 def iniciar_hello_protocol(meu_ip, interfaces_wan, grafo_dinamico):
@@ -222,19 +278,8 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
 
                     # 1) RECUPERA GRAFO -------------------------------------------------------
                     if comando == "graph":
-                        # serializa todas as arestas (somente externas) com peso
-                        arestas = []
-                        for a, b, dados in grafo_dinamico.edges(data=True):
-                            peso = dados.get("weight", 1)
-                            arestas.append((a, b, peso))
-
-                        resposta = {
-                            "tipo": "cli_graph",
-                            "origem": minha_iface,   # qq interface local serve
-                            "arestas": arestas
-                        }
-                        sock.sendto(json.dumps(resposta).encode(), (ip_remetente, 5001))
-                        continue   # fim do comando graph
+                        salvar_grafo(grafo_dinamico, meu_ip)
+                        continue
                     # -------------------------------------------------------------------------
 
                     # 2) COMANDOS DE PESO ------------------------------------------------------
