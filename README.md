@@ -2,7 +2,7 @@
 
 Este documento apresenta a linha do tempo da evolução da Telemar Network, um simulador de rede em Python com suporte a roteamento dinâmico, detecção de falhas, traceroute, ping e visualização gráfica.
 
-🧠 Fase Conceitual e Protótipo Inicial
+### 🧠 Fase Conceitual e Protótipo Inicial
 
 ## ✨ Versão 1.0
 
@@ -14,7 +14,7 @@ Comunicacão era feita por portas distintas.
 
 Topologia pré-definida e estática.
 
-🧪 Fase de Expansão Estrutural
+### 🧪 Fase de Expansão Estrutural
 
 ## ✨ Versão 2.0
 
@@ -30,7 +30,7 @@ Implementação do comando PING com TTL e estatísticas realistas.
 
 Comunicação interna consolidada.
 
-🗺️ Fase de Autodescoberta
+### 🗺️ Fase de Autodescoberta
 
 ## ✨ Versão 3.0
 
@@ -40,7 +40,7 @@ Cada roteador constrói dinamicamente sua visão da rede.
 
 O grafo é propagado em tempo real com atualizações de topologia.
 
-⚙️ Fase Interativa
+### ⚙️ Fase Interativa
 
 ## ✨ Versão 4.0
 
@@ -92,4 +92,3 @@ TRACEROUTE agora alcança hosts finais.
 
 Grafo atualizado reflete corretamente os roteadores e suas subredes.
 
-Sistema considerado robusto e pronto para migração ao Docker.
