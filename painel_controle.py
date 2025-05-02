@@ -5,29 +5,6 @@ import matplotlib.pyplot as plt
 CLI_PORT = 5001          # onde o roteador enviará o grafo
 TIMEOUT  = 3             # seg p/ aguardar respostas
 
-def receber_graph(sock):
-    sock.settimeout(TIMEOUT)
-    try:
-        data, _ = sock.recvfrom(65535)
-        msg = json.loads(data.decode())
-        if msg.get("tipo") == "cli_graph":
-            return msg["arestas"]
-    except socket.timeout:
-        print("⏰  Não houve resposta do roteador.")
-    return None
-
-def desenhar(arestas, nome_arquivo):
-    G = nx.Graph()
-    for a, b, w in arestas:
-        G.add_edge(a, b, weight=w)
-    pos = nx.spring_layout(G, seed=42)
-    labels = nx.get_edge_attributes(G, "weight")
-    nx.draw(G, pos, with_labels=True, node_color="skyblue", node_size=900)
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-    plt.title("Topologia recebida")
-    plt.savefig(nome_arquivo)
-    plt.close()
-    print(f"📄  Grafo salvo em {nome_arquivo}")
 
 def enviar_comando(ip_router, comando, iface=None):
     pkt = {"tipo":"cli_comando", "comando":comando}
@@ -72,10 +49,8 @@ def main():
 
         elif opcao == "4":
             enviar_comando(router_ip, "graph")
-            print("⌛  Aguardando grafo …")
-            arestas = receber_graph(sock_listen)
-            if arestas:
-                desenhar(arestas, "grafo_recebido.png")
+            print("📷  Comando enviado. O grafo será salvo como imagem no roteador.")
+                
         else:
             print("Opção inválida.")
 
