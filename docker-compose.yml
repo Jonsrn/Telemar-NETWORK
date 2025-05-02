@@ -1,0 +1,198 @@
+{
+  "version": "3",
+  "services": {
+    "router1": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "router1",
+      "volumes": [
+        "vol_router1:/dados",
+        "./grafos:/app/grafos"
+      ],
+      "networks": {
+        "net_127.1.0": {
+          "ipv4_address": "172.1.0.1"
+        },
+        "net_127.1.1": {
+          "ipv4_address": "172.1.0.1"
+        }
+      },
+      "command": "python src/roteador.py --meu_ip 172.1.0.1 --lan 172.1.0.10 172.1.0.11 172.1.0.12 172.1.0.13 172.1.0.14 172.1.0.15 172.1.0.16 172.1.0.17 172.1.0.18 172.1.0.19 --wan {\"172.1.1.1\": [\"172.1.1.2\"]}"
+    },
+    "host1_1": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host1_1",
+      "networks": {
+        "net_127.1.0": {
+          "ipv4_address": "172.1.0.10"
+        }
+      },
+      "command": "python src/host.py 172.1.0.10 172.1.0.1"
+    },
+    "host1_2": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host1_2",
+      "networks": {
+        "net_127.1.0": {
+          "ipv4_address": "172.1.0.11"
+        }
+      },
+      "command": "python src/host.py 172.1.0.11 172.1.0.1"
+    },
+    "router2": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "router2",
+      "volumes": [
+        "vol_router2:/dados",
+        "./grafos:/app/grafos"
+      ],
+      "networks": {
+        "net_127.2.1": {
+          "ipv4_address": "172.2.0.1"
+        },
+        "net_127.2.0": {
+          "ipv4_address": "172.2.0.1"
+        },
+        "net_127.1.1": {
+          "ipv4_address": "172.2.0.1"
+        }
+      },
+      "command": "python src/roteador.py --meu_ip 172.2.0.1 --lan 172.2.0.10 172.2.0.11 172.2.0.12 172.2.0.13 172.2.0.14 172.2.0.15 172.2.0.16 172.2.0.17 172.2.0.18 172.2.0.19 --wan {\"172.1.1.2\": [\"172.1.1.1\"], \"172.2.1.1\": [\"172.2.1.2\"]}"
+    },
+    "host2_1": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host2_1",
+      "networks": {
+        "net_127.2.0": {
+          "ipv4_address": "172.2.0.10"
+        }
+      },
+      "command": "python src/host.py 172.2.0.10 172.2.0.1"
+    },
+    "host2_2": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host2_2",
+      "networks": {
+        "net_127.2.0": {
+          "ipv4_address": "172.2.0.11"
+        }
+      },
+      "command": "python src/host.py 172.2.0.11 172.2.0.1"
+    },
+    "router3": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "router3",
+      "volumes": [
+        "vol_router3:/dados",
+        "./grafos:/app/grafos"
+      ],
+      "networks": {
+        "net_127.2.1": {
+          "ipv4_address": "172.3.0.1"
+        },
+        "net_127.3.0": {
+          "ipv4_address": "172.3.0.1"
+        }
+      },
+      "command": "python src/roteador.py --meu_ip 172.3.0.1 --lan 172.3.0.10 172.3.0.11 172.3.0.12 172.3.0.13 172.3.0.14 172.3.0.15 172.3.0.16 172.3.0.17 172.3.0.18 172.3.0.19 --wan {\"172.2.1.2\": [\"172.2.1.1\"]}"
+    },
+    "host3_1": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host3_1",
+      "networks": {
+        "net_127.3.0": {
+          "ipv4_address": "172.3.0.10"
+        }
+      },
+      "command": "python src/host.py 172.3.0.10 172.3.0.1"
+    },
+    "host3_2": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host3_2",
+      "networks": {
+        "net_127.3.0": {
+          "ipv4_address": "172.3.0.11"
+        }
+      },
+      "command": "python src/host.py 172.3.0.11 172.3.0.1"
+    }
+  },
+  "networks": {
+    "net_127.1.0": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.1.0.0/24"
+          }
+        ]
+      }
+    },
+    "net_127.1.1": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.1.1.0/24"
+          }
+        ]
+      }
+    },
+    "net_127.2.0": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.2.0.0/24"
+          }
+        ]
+      }
+    },
+    "net_127.2.1": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.2.1.0/24"
+          }
+        ]
+      }
+    },
+    "net_127.3.0": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.3.0.0/24"
+          }
+        ]
+      }
+    }
+  },
+  "volumes": {
+    "vol_router1": {},
+    "vol_router2": {},
+    "vol_router3": {}
+  }
+}
