@@ -12,37 +12,52 @@ def escutar(meu_ip):
     print(f"[HOST {meu_ip}] Escutando...")
 
     while True:
-        data, addr = sock.recvfrom(4096)
         try:
-            pacote = json.loads(data.decode())
-            tipo = pacote.get("tipo", "mensagem")
+            data, addr = sock.recvfrom(4096)
+            try:
+                pacote = json.loads(data.decode())
+                tipo = pacote.get("tipo", "mensagem")
 
-            if tipo == "mensagem":
-                print(f"[HOST {meu_ip}] De {pacote['origem']}: {pacote['mensagem']}")
+                if tipo == "mensagem":
+                    print(f"[HOST {meu_ip}] De {pacote['origem']}: {pacote['mensagem']}")
 
-            elif tipo == "ping":
-                resposta = {
-                    "tipo": "pong",
-                    "origem": meu_ip,
-                    "destino": pacote["origem"],
-                    "timestamp": pacote["timestamp"],
-                    "ttl": pacote.get("ttl", "?")
-                }
-                sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
+                elif tipo == "ping":
+                    resposta = {
+                        "tipo": "pong",
+                        "origem": meu_ip,
+                        "destino": pacote["origem"],
+                        "timestamp": pacote["timestamp"],
+                        "ttl": pacote.get("ttl", "?")
+                    }
+                    sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
 
-            elif tipo == "pong":
-                ts = pacote.get("timestamp")
-                if ts in pings_ativos:
-                    tempo_ida_volta = int((time.time() - ts) * 1000)
-                    print(f"Resposta de {pacote['origem']}: bytes=32 tempo={tempo_ida_volta}ms TTL={pacote.get('ttl', '?')}")
-                    pings_ativos[ts]["latencia"] = tempo_ida_volta
+                elif tipo == "pong":
+                    ts = pacote.get("timestamp")
+                    if ts in pings_ativos:
+                        tempo_ida_volta = int((time.time() - ts) * 1000)
+                        print(f"Resposta de {pacote['origem']}: bytes=32 tempo={tempo_ida_volta}ms TTL={pacote.get('ttl', '?')}")
+                        pings_ativos[ts]["latencia"] = tempo_ida_volta
 
+                elif tipo == "traceroute":
+                    resposta = {
+                        "tipo": "traceroute_reply",
+                        "origem": meu_ip,
+                        "numero": pacote["numero"]
+                    }
+                    porta_destino = pacote.get("reply_port", 5000)
+                    sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], porta_destino))
+                    #print(f"[HOST {meu_ip}] Respondeu traceroute para {pacote['origem']}")
 
-            else:
-                print(f"[HOST {meu_ip}] Pacote desconhecido: {pacote}")
+                else:
+                    print(f"[HOST {meu_ip}] Pacote desconhecido: {pacote}")
 
-        except Exception as e:
-            print(f"[HOST {meu_ip}] Pacote inválido ou erro: {e}")
+            except Exception as e:
+                print(f"[HOST {meu_ip}] Pacote inválido ou erro: {e}")
+
+        except ConnectionResetError as e:
+            #print(f"[HOST {meu_ip}] Aviso: conexão resetada pelo host remoto: {e}")
+            continue  # continua escutando normalmente
+
 
 
 def realizar_ping(destino_ip, meu_ip, gateway_ip, sock):
