@@ -1,4 +1,4 @@
-##Telemar Network - Linha do Tempo e Evolução
+# Telemar Network - Linha do Tempo e Evolução
 
 Este documento apresenta a linha do tempo da evolução da Telemar Network, um simulador de rede em Python com suporte a roteamento dinâmico, detecção de falhas, traceroute, ping e visualização gráfica.
 
