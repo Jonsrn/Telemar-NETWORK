@@ -102,6 +102,17 @@ def salvar_grafo(grafo_dinamico, meu_ip, interfaces_locais):
     print(f"[CLI] Topologia salva como {nome}")
 
 
+def encontrar_iface_por_subrede(ip_destino, interfaces_locais):
+    partes_dest = ip_destino.split(".")
+    prefixo_dest = ".".join(partes_dest[:3])  # 127.X.Y
+
+    for iface in interfaces_locais:
+        partes_iface = iface.split(".")
+        prefixo_iface = ".".join(partes_iface[:3])
+        if prefixo_dest == prefixo_iface:
+            return iface
+    return None
+
 
 
 # === Protocolo HELLO ===
@@ -435,8 +446,9 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                         continue
 
                 # Entrega local (para hosts ou para o próprio roteador)
-                if entrega_final in subrede_local or entrega_final == minha_iface:
-                    print(f"[IF {minha_iface}] Entrega local → {entrega_final}")
+                # Entrega local (HOST LAN local ou interfaces do roteador local)
+                if entrega_final in subrede_local or entrega_final in interfaces_locais:
+                    print(f"[IF {minha_iface}] Entrega local direta → {entrega_final}")
 
                     # Responde pings enviados ao próprio roteador
                     if tipo == "ping" and entrega_final == minha_iface:
@@ -450,34 +462,43 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                         sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
                         continue
 
-                    # Caso seja pra host na LAN
+                    # Caso seja pra host na LAN local
                     sock.sendto(data, (entrega_final, 5000))
                     continue
 
-                # Calcula roteador da subrede do destino
-                partes = entrega_final.split(".")
-                gateway_destino = f"{partes[0]}.{partes[1]}.{partes[2]}.1"
-                proximo = calcular_proximo_salto(grafo_dinamico, minha_iface, gateway_destino)
-                if not proximo:
-                    print(f"[IF {minha_iface}] Sem rota para {destino}")
+                # WAN direta (roteadores diretamente conectados na WAN)
+                if entrega_final in vizinho_para_iface:
+                    iface_saida = vizinho_para_iface[entrega_final]
+                    print(f"[IF {minha_iface}] Encaminhando diretamente ao vizinho {entrega_final} via {iface_saida}")
+                    sockets[iface_saida].sendto(data, (entrega_final, 5000))
                     continue
 
-                if proximo == minha_iface:
-                    sock.sendto(data, (proximo, 5000))
+                # Se for um HOST remoto (não existe no grafo), calcula o gateway remoto (.1)
+                partes = entrega_final.split(".")
+                gateway_destino = f"{partes[0]}.{partes[1]}.{partes[2]}.1"
 
-                
-                # Verifica se o próximo salto é outra interface local
+                # Usa Dijkstra para achar próximo salto até o gateway da subrede destino
+                proximo = calcular_proximo_salto(grafo_dinamico, minha_iface, gateway_destino)
+
+                if not proximo:
+                    print(f"[IF {minha_iface}] Sem rota para o gateway {gateway_destino}")
+                    continue
+
+                # Se o próximo salto é interno (outra iface local)
                 if proximo in interfaces_locais:
                     print(f"[IF {minha_iface}] Encaminhamento interno → {proximo}")
                     sockets[proximo].sendto(data, (proximo, 5000))
-                    continue
-                # 👇 Caso contrário, busca a interface correta para enviar externamente 
+
+                # Caso contrário, busca a interface correta para enviar externamente 
                 elif proximo in vizinho_para_iface:
                     iface_saida = vizinho_para_iface[proximo]
-                    sockets[iface_saida].sendto(data, (proximo, 5000))
                     print(f"[IF {minha_iface}] Encaminhando para {proximo} via {iface_saida}")
+                    sockets[iface_saida].sendto(data, (proximo, 5000))
+
                 else:
-                    print(f"[IF {minha_iface}] Sem interface para {proximo}")
+                    print(f"[IF {minha_iface}] Sem interface conhecida para alcançar {proximo}")
+
+
 
             except Exception as e:
                 print(f"[IF {minha_iface}] Erro: {e}")
