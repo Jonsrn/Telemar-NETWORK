@@ -5,7 +5,7 @@ import networkx as nx
 import time 
 import matplotlib.pyplot as plt
 import argparse
-
+import os
 import math
 
 # Para salvar graficamente o grafo
@@ -96,7 +96,7 @@ def salvar_grafo(grafo_dinamico, meu_ip, interfaces_locais):
     plt.axis("off")
     plt.tight_layout()
 
-    nome = f"grafo_{meu_ip.replace('.', '_')}.png"
+    nome = os.path.join("grafos", f"grafo_{meu_ip.replace('.', '_')}.png")
     plt.savefig(nome, dpi=150)
     plt.close()
     print(f"[CLI] Topologia salva como {nome}")
