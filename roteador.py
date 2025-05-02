@@ -9,58 +9,88 @@ import argparse
 import math
 
 # Para salvar graficamente o grafo
-def salvar_grafo(grafo_dinamico, meu_ip):
-    import math, time
+def salvar_grafo(grafo_dinamico, meu_ip, interfaces_locais):
+
     time.sleep(1)
 
-    # ── 1. agrupa portas por roteador ("127.X") ────────────────────────────
-    clusters = {}
-    for n in grafo_dinamico.nodes():
-        rid = '.'.join(n.split('.')[:2])          # exemplo: 127.3
-        clusters.setdefault(rid, []).append(n)
+    # Agrupa interfaces pelo roteador baseado em conexões internas (peso 0)
+    def agrupar_interfaces(grafo):
+        clusters = []
+        visitado = set()
 
-    # ── 2. posiciona centros dos roteadores num anel grande ────────────────
+        for node in grafo.nodes():
+            if node in visitado:
+                continue
+
+            cluster = set()
+            fila = [node]
+
+            while fila:
+                atual = fila.pop()
+                if atual in visitado:
+                    continue
+
+                visitado.add(atual)
+                cluster.add(atual)
+
+                for viz in grafo.neighbors(atual):
+                    if grafo[atual][viz].get("weight", 1) == 0:
+                        fila.append(viz)
+
+            clusters.append(cluster)
+
+        return clusters
+
+    clusters = agrupar_interfaces(grafo_dinamico)
+
+    # Posiciona roteadores em um anel externo
     N = len(clusters)
     R_outer = 10
     pos = {}
-    centers = {}                                 # guarda posição do "hub"
+    centers = {}
+    Gdraw = grafo_dinamico.copy()
 
-    for k, (rid, ifaces) in enumerate(sorted(clusters.items())):
-        ang_c = 2 * math.pi * k / N
+    for idx, cluster in enumerate(sorted(clusters, key=lambda x: meu_ip in x, reverse=True)):
+        ang_c = 2 * math.pi * idx / N
         cx, cy = R_outer * math.cos(ang_c), R_outer * math.sin(ang_c)
-        centers[rid] = (cx, cy)
+        centers[idx] = (cx, cy)
 
-        m = len(ifaces)
-        R_inner = 1.2 + 0.3 * m                  # raio interno cresce p/ + portas
-        for i, iface in enumerate(sorted(ifaces)):
-            ang = 2 * math.pi * i / m + ang_c    # gira de leve junto com cluster
-            pos[iface] = (cx + R_inner * math.cos(ang),
-                          cy + R_inner * math.sin(ang))
+        hub_name = f"hub_{idx}"
+        Gdraw.add_node(hub_name)
+        pos[hub_name] = (cx, cy)
 
-    # ── 3. adiciona arestas internas p/ formar polígono /////////////////////
-    G = grafo_dinamico.copy()
-    for ifaces in clusters.values():
-        m = len(ifaces)
-        if m >= 3:
+        interfaces = sorted(cluster)
+        m = len(interfaces)
+        R_inner = 1.3 + 0.35 * m
+
+        for i, iface in enumerate(interfaces):
+            if m == 1:
+                ang = ang_c + math.pi / 2
+            else:
+                ang = ang_c + (2 * math.pi * i / m)
+
+            px = cx + R_inner * math.cos(ang)
+            py = cy + R_inner * math.sin(ang)
+            pos[iface] = (px, py)
+
+            # conecta visualmente interfaces ao hub
+            Gdraw.add_edge(hub_name, iface)
+
+        # fecha polígono visual
+        if m >= 2:
             for i in range(m):
-                G.add_edge(ifaces[i], ifaces[(i+1)%m])
-        elif m == 2:
-            G.add_edge(ifaces[0], ifaces[1])
-        # m==1  -> não liga nada
+                Gdraw.add_edge(interfaces[i], interfaces[(i + 1) % m])
 
-    # ── 4. desenha //////////////////////////////////////////////////////////
     plt.figure(figsize=(11, 8))
-    nx.draw(G, pos,
-            with_labels=True,
-            node_color="skyblue",
-            node_size=1100,
-            edge_color="gray",
-            font_size=9,
-            font_weight="bold")
 
-    # hub visual no centro de cada roteador
-    xs, ys = zip(*centers.values())
-    plt.scatter(xs, ys, s=80, c="#888888")
+    ports = [n for n in Gdraw.nodes() if not str(n).startswith("hub")]
+    hubs = [n for n in Gdraw.nodes() if str(n).startswith("hub")]
+
+    nx.draw_networkx_nodes(Gdraw, pos, nodelist=ports, node_color="skyblue", node_size=1100)
+    nx.draw_networkx_nodes(Gdraw, pos, nodelist=hubs, node_color="#888888", node_size=80)
+    nx.draw_networkx_edges(Gdraw, pos, edge_color="gray", width=1.4)
+
+    nx.draw_networkx_labels(Gdraw, pos, labels={n: n for n in ports}, font_size=9, font_weight="bold")
 
     plt.title(f"Topologia – roteador {meu_ip}")
     plt.axis("off")
@@ -70,6 +100,7 @@ def salvar_grafo(grafo_dinamico, meu_ip):
     plt.savefig(nome, dpi=150)
     plt.close()
     print(f"[CLI] Topologia salva como {nome}")
+
 
 
 
@@ -278,8 +309,9 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
 
                     # 1) RECUPERA GRAFO -------------------------------------------------------
                     if comando == "graph":
-                        salvar_grafo(grafo_dinamico, meu_ip)
+                        salvar_grafo(grafo_dinamico, meu_ip, interfaces_locais)
                         continue
+
                     # -------------------------------------------------------------------------
 
                     # 2) COMANDOS DE PESO ------------------------------------------------------
@@ -513,9 +545,9 @@ if __name__ == "__main__":
     
     '''
     # === Salva imagem do grafo após 60 segundos
-    threading.Thread(
+   threading.Thread(
         target=salvar_grafo,
-        args=(grafo_dinamico, meu_ip),
+        args=(grafo_dinamico, meu_ip, interfaces_locais),
         daemon=True
     ).start()  
 
