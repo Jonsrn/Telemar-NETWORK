@@ -372,17 +372,46 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                                     (pacote["origem"], porta_dest))
                         continue
 
-                    # ▶ Quando TTL chegar a 0  (resposta ttl_exceeded)
+                    # ▶ Quando TTL chegar a 0  ➜ devolve “ttl_exceeded” ao host de origem
                     pacote["ttl"] -= 1
                     if pacote["ttl"] <= 0:
+                        host_origem = pacote["origem"]            # quem iniciou o traceroute
+                        reply_port  = pacote.get("reply_port", 5000)
+
+                        # ── CASO 1 • host está NA MINHA LAN -------------------------------
+                        if host_origem in subrede_local:
+                            resposta = {
+                                "tipo"       : "ttl_exceeded",
+                                "hop"        : minha_iface,
+                                "numero"     : pacote["numero"],
+                                "ttl"        : 10
+                            }
+                            sock.sendto(json.dumps(resposta).encode(),
+                                        (host_origem, reply_port))
+                            continue
+                        # ── CASO 2 • host em outra sub-rede -------------------------------
+                        p0, p1, p2, _ = host_origem.split(".")
+                        gateway_dst = f"{p0}.{p1}.{p2}.1"
+
+                        proximo = calcular_proximo_salto(grafo_dinamico,
+                                                        minha_iface,
+                                                        gateway_dst)
+                        if not proximo:                          # sem rota → abandona
+                            print(f"[IF {minha_iface}] Sem rota p/ {host_origem}")
+                            continue
+
                         resposta = {
-                            "tipo": "ttl_exceeded",
-                            "hop" : minha_iface,
-                            "numero": pacote["numero"]
+                            "tipo"         : "ttl_exceeded",
+                            "hop"          : minha_iface,
+                            "numero"       : pacote["numero"],
+                            "destino"      : proximo,
+                            "entrega_final": host_origem,
+                            "reply_port"   : reply_port,
+                            "ttl"          : 10
                         }
-                        porta_dest = pacote.get("reply_port", 5000)   # ➌ usa porta do host
-                        sock.sendto(json.dumps(resposta).encode(),
-                                    (pacote["origem"], porta_dest))
+                        iface_out = vizinho_para_iface.get(proximo, proximo)
+                        sockets[iface_out].sendto(json.dumps(resposta).encode(),
+                              (proximo, 5000))
                         continue
 
                     # Segue encaminhando o traceroute normalmente
@@ -446,26 +475,83 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                         sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
                         continue
 
-                # Entrega local (para hosts ou para o próprio roteador)
-                # Entrega local (HOST LAN local ou interfaces do roteador local)
+
+                # ------------------------------------------------------------------
+                # Entrega local: HOST da LAN ou interface do próprio roteador
+                # ------------------------------------------------------------------
                 if entrega_final in subrede_local or entrega_final in interfaces_locais:
                     print(f"[IF {minha_iface}] Entrega local direta → {entrega_final}")
 
-                    # Responde pings enviados ao próprio roteador
+                    # ▸ 1. PING destinado à interface do roteador -------------------
+                    # ▸ 1. PING destinado à interface do roteador -------------------
                     if tipo == "ping" and entrega_final == minha_iface:
+                        host_origem = pacote["origem"]
+
+                        # Caso 1: host está na mesma LAN → responde direto
+                        if host_origem in subrede_local:
+                            resposta = {
+                                "tipo"         : "pong",
+                                "origem"       : minha_iface,
+                                "destino"      : host_origem,
+                                "entrega_final": host_origem,
+                                "timestamp"    : pacote["timestamp"],
+                                "ttl"          : 10
+                            }
+                            sock.sendto(json.dumps(resposta).encode(), (host_origem, 5000))
+                            continue
+
+                        # Caso 2: host está em outra rede → calcula rota normalmente
+                        p0, p1, p2, _ = host_origem.split(".")
+                        gateway_dst = f"{p0}.{p1}.{p2}.1"
+
+                        proximo = calcular_proximo_salto(grafo_dinamico, minha_iface, gateway_dst)
+                        if not proximo:
+                            print(f"[IF {minha_iface}] Sem rota p/ {host_origem}")
+                            continue
+
                         resposta = {
-                            "tipo": "pong",
-                            "origem": minha_iface,
-                            "destino": pacote["origem"],
-                            "timestamp": pacote["timestamp"],
-                            "ttl": pacote.get("ttl", "?")
+                            "tipo"         : "pong",
+                            "origem"       : minha_iface,
+                            "destino"      : proximo,
+                            "entrega_final": host_origem,
+                            "timestamp"    : pacote["timestamp"],
+                            "ttl"          : 10
                         }
-                        sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
+                        iface_out = vizinho_para_iface.get(proximo, proximo)
+                        sockets[iface_out].sendto(json.dumps(resposta).encode(), (proximo, 5000))
                         continue
 
-                    # Caso seja pra host na LAN local
-                    sock.sendto(data, (entrega_final, 5000))
+
+                    # ▸ 2. TRACEROUTE destinado à interface do roteador -------------
+                    if tipo == "traceroute" and entrega_final == minha_iface:
+                        host_origem = pacote["origem"]
+
+                        p0, p1, p2, _ = host_origem.split(".")
+                        gateway_dst = f"{p0}.{p1}.{p2}.1"
+
+                        proximo = calcular_proximo_salto(grafo_dinamico, minha_iface, gateway_dst)
+                        if not proximo:
+                            print(f"[IF {minha_iface}] Sem rota p/ {host_origem}")
+                            continue
+
+                        resposta = {
+                            "tipo"         : "traceroute_reply",
+                            "origem"       : minha_iface,
+                            "destino"      : proximo,
+                            "entrega_final": host_origem,
+                            "numero"       : pacote["numero"],
+                            "ttl"          : 10,
+                            "reply_port"   : pacote.get("reply_port", 5000)
+                        }
+                        iface_out = vizinho_para_iface.get(proximo, proximo)
+                        sockets[iface_out].sendto(json.dumps(resposta).encode(), (proximo, 5000))
+                        continue  # já tratamos!
+
+                    # ▸ 3. Qualquer outro tráfego local (hosts da própria LAN) ------
+                    porta_alvo = pacote.get("reply_port", 5000)
+                    sock.sendto(data, (entrega_final, porta_alvo))
                     continue
+
 
                 # WAN direta (roteadores diretamente conectados na WAN)
                 if entrega_final in vizinho_para_iface:
@@ -487,8 +573,19 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
 
                 # Se o próximo salto é interno (outra iface local)
                 if proximo in interfaces_locais:
-                    print(f"[IF {minha_iface}] Encaminhamento interno → {proximo}")
-                    sockets[proximo].sendto(data, (proximo, 5000))
+                    if entrega_final in subrede_local:
+                        # ▸ distinguir pedido × resposta
+                        if tipo in ("traceroute_reply", "ttl_exceeded"):
+                            porta_alvo = pacote.get("reply_port", 5000)
+                        else:                                # requisição normal
+                            porta_alvo = 5000
+
+                        sockets[proximo].sendto(data, (entrega_final, porta_alvo))
+                        continue
+                    else:
+                        print(f"[IF {minha_iface}] Encaminhamento interno → {proximo}")
+                        sockets[proximo].sendto(data, (proximo, 5000))
+                    continue
 
                 # Caso contrário, busca a interface correta para enviar externamente 
                 elif proximo in vizinho_para_iface:
