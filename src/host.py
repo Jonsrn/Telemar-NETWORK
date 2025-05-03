@@ -6,7 +6,7 @@ import time
 
 pings_ativos = {}
 
-def escutar(meu_ip):
+def escutar(meu_ip, gateway_ip):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((meu_ip, 5000))
     print(f"[HOST {meu_ip}] Escutando...")
@@ -25,11 +25,12 @@ def escutar(meu_ip):
                     resposta = {
                         "tipo": "pong",
                         "origem": meu_ip,
-                        "destino": pacote["origem"],
+                        "destino": gateway_ip,              # roteador local
+                        "entrega_final": pacote["origem"],  # host de origem
                         "timestamp": pacote["timestamp"],
-                        "ttl": pacote.get("ttl", "?")
+                        "ttl": pacote.get("ttl", "?")        # mantém TTL recebido
                     }
-                    sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], 5000))
+                    sock.sendto(json.dumps(resposta).encode(), (gateway_ip, 5000))
 
                 elif tipo == "pong":
                     ts = pacote.get("timestamp")
@@ -42,11 +43,11 @@ def escutar(meu_ip):
                     resposta = {
                         "tipo": "traceroute_reply",
                         "origem": meu_ip,
-                        "numero": pacote["numero"]
+                        "numero": pacote["numero"],
+                        "ttl": pacote.get("ttl", 10)
                     }
                     porta_destino = pacote.get("reply_port", 5000)
                     sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], porta_destino))
-                    #print(f"[HOST {meu_ip}] Respondeu traceroute para {pacote['origem']}")
 
                 else:
                     print(f"[HOST {meu_ip}] Pacote desconhecido: {pacote}")
@@ -209,5 +210,5 @@ if __name__ == "__main__":
     meu_ip = sys.argv[1]
     gateway_ip = sys.argv[2]
 
-    threading.Thread(target=escutar, args=(meu_ip,), daemon=True).start()
+    threading.Thread(target=escutar, args=(meu_ip, gateway_ip), daemon=True).start()
     enviar_loop(meu_ip, gateway_ip)
