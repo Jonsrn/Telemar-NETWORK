@@ -8,6 +8,18 @@ import argparse
 import os
 import math
 
+def aguardar_ip_disponivel(ip, porta, tentativas=30):
+    for i in range(tentativas):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.bind((ip, porta))
+            s.close()
+            return  # sucesso
+        except OSError:
+            print(f"[Roteador] Aguardando IP {ip}:{porta}... tentativa {i+1}")
+            time.sleep(1)
+    raise RuntimeError(f"[ERRO] IP {ip}:{porta} não ficou disponível a tempo.")
+
 # Para salvar graficamente o grafo
 def salvar_grafo(grafo_dinamico, meu_ip, interfaces_locais):
 
@@ -516,6 +528,7 @@ if __name__ == "__main__":
     interfaces_locais = set([meu_ip] + list(interfaces_wan.keys()))
 
     for ip in interfaces:
+        aguardar_ip_disponivel(ip, 5000)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((ip, 5000))
         sockets[ip] = sock
