@@ -28,7 +28,7 @@ def escutar(meu_ip, gateway_ip):
                         "destino": gateway_ip,              # roteador local
                         "entrega_final": pacote["origem"],  # host de origem
                         "timestamp": pacote["timestamp"],
-                        "ttl": pacote.get("ttl", "?")        # mantém TTL recebido
+                        "ttl": 10                           # <── zera/renova o TTL
                     }
                     sock.sendto(json.dumps(resposta).encode(), (gateway_ip, 5000))
 
@@ -40,14 +40,18 @@ def escutar(meu_ip, gateway_ip):
                         pings_ativos[ts]["latencia"] = tempo_ida_volta
 
                 elif tipo == "traceroute":
-                    resposta = {
-                        "tipo": "traceroute_reply",
-                        "origem": meu_ip,
-                        "numero": pacote["numero"],
-                        "ttl": pacote.get("ttl", 10)
-                    }
-                    porta_destino = pacote.get("reply_port", 5000)
-                    sock.sendto(json.dumps(resposta).encode(), (pacote["origem"], porta_destino))
+                    print(f"[HOST {meu_ip}] Recebeu traceroute com entrega_final = {pacote.get('entrega_final')}")
+                    if pacote.get("entrega_final") == meu_ip:
+                        resposta = {
+                            "tipo"         : "traceroute_reply",
+                            "origem"       : meu_ip,
+                            "destino"      : gateway_ip,          # ← **enviar ao roteador**
+                            "entrega_final": pacote["origem"],    # ← host que iniciou
+                            "numero"       : pacote["numero"],
+                            "ttl"          : 10,                  # renova-TTL p/ a volta
+                            "reply_port"   : pacote.get("reply_port", 5000)
+                        }
+                        sock.sendto(json.dumps(resposta).encode(), (gateway_ip, 5000))
 
                 else:
                     print(f"[HOST {meu_ip}] Pacote desconhecido: {pacote}")
