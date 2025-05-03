@@ -44,80 +44,87 @@ def executar_local():
         time.sleep(0.5)
 
 # ───── Função para converter IPs e gerar docker-compose ──────────────
-def gerar_docker_compose():
-    def ip_docker(ip):
-        parts = ip.split(".")
-        return f"172.{parts[1]}.{parts[2]}.{parts[3]}"
+# ─── Função para converter IPs e gerar docker-compose (arquitetura “pod”) ────
+def gerar_docker_compose() -> None:
+    """Gera docker-compose.yml usando .1 para roteadores LAN e gateway Docker .254"""
 
-    compose = {
-        "version": "3",
-        "services": {},
-        "networks": {},
-        "volumes": {}
-    }
+    def ip_docker(ip127: str) -> str:
+        # 127.b.c.d  ->  172.b.c.d   (mantém octetos)
+        _, b, c, d = ip127.split(".")
+        return f"172.{b}.{c}.{d}"
 
-    for idx, rot in enumerate(roteadores):
-        nome = f"router{idx+1}"
-        lan_redes = set()
+    compose = {"version": "3", "services": {}, "networks": {}, "volumes": {}}
 
-        # Comando com caminho para roteador.py
-        cmd = ["python", "src/roteador.py", "--meu_ip", ip_docker(rot["meu_ip"]), "--lan"] + \
-              [ip_docker(ip) for ip in rot["lan"]] + \
-              ["--wan", json.dumps({ip_docker(k): [ip_docker(v) for v in vs] for k, vs in rot["wan"].items()})]
+    for idx, rot in enumerate(roteadores, 1):
+        # ---------- LAN privada -------------------------------------------
+        lan_name   = f"lan_{idx}"
+        lan_pref   = 100 + idx               # 172.101 / 102 / 103…
+        router_lan = f"172.{lan_pref}.0.1"   # << agora .1
+        host_ips   = [f"172.{lan_pref}.0.10", f"172.{lan_pref}.0.11"]
 
-        # LAN networks
-        for ip in rot["lan"]:
-            net_name = f"net_{'.'.join(ip.split('.')[:3])}"
-            compose["networks"].setdefault(net_name, {
-                "ipam": {"config": [{"subnet": f"{'.'.join(ip_docker(ip).split('.')[:3])}.0/24"}]}
-            })
-            lan_redes.add(net_name)
-
-        # WAN networks
-        for iface in rot["wan"]:
-            net_name = f"net_{'.'.join(iface.split('.')[:3])}"
-            compose["networks"].setdefault(net_name, {
-                "ipam": {"config": [{"subnet": f"{'.'.join(ip_docker(iface).split('.')[:3])}.0/24"}]}
-            })
-
-        # Roteador
-        compose["services"][nome] = {
-            "build": {
-                "context": ".",
-                "dockerfile": "Dockerfile"
-            },
-            "container_name": nome,
-            "volumes": [
-                f"vol_{nome}:/dados",
-                "./grafos:/app/grafos"  # Salvar grafo fora do container
-            ],
-            "networks": {
-                n: {"ipv4_address": ip_docker(rot["meu_ip"])}
-                for n in lan_redes.union([f"net_{'.'.join(ip.split('.')[:3])}" for ip in rot["wan"]])
-            },
-            "command": " ".join(cmd)
+        compose["networks"][lan_name] = {
+            "ipam": {"config": [
+                {"subnet": f"172.{lan_pref}.0.0/24",
+                 "gateway": f"172.{lan_pref}.0.254"}   # gateway docker
+            ]}
         }
-        compose["volumes"][f"vol_{nome}"] = {}
+        router_nets = {lan_name: {"ipv4_address": router_lan}}
 
-        # Hosts (2 por roteador)
-        for i in range(2):
-            host_name = f"host{idx+1}_{i+1}"
-            host_ip = ip_docker(rot["lan"][i])
-            compose["services"][host_name] = {
-                "build": {
-                    "context": ".",
-                    "dockerfile": "Dockerfile"
-                },
-                "container_name": host_name,
-                "networks": {
-                    f"net_{'.'.join(rot['lan'][i].split('.')[:3])}": {"ipv4_address": host_ip}
-                },
-                "command": f"python src/host.py {host_ip} {ip_docker(rot['meu_ip'])}"
+        # ---------- WANs ---------------------------------------------------
+        for iface_ip, viz in rot["wan"].items():
+            b, c = iface_ip.split(".")[1:3]          # 127.b.c.x
+            wan_name = f"wan_{b}_{c}"
+            wan_sub  = f"172.{b}.{c}.0/24"
+
+            compose["networks"].setdefault(
+                wan_name,
+                {"ipam": {"config": [
+                    {"subnet": wan_sub, "gateway": f"172.{b}.{c}.254"}
+                ]}}
+            )
+            router_nets[wan_name] = {"ipv4_address": ip_docker(iface_ip)}
+
+        # ---------- --wan JSON --------------------------------------------
+        wan_json = json.dumps({
+            ip_docker(local): [ip_docker(v) for v in viz]
+            for local, viz in rot["wan"].items()
+        })
+
+        # ---------- serviço do roteador -----------------------------------
+        rname = f"router{idx}"
+        compose["services"][rname] = {
+            "build": {"context": ".", "dockerfile": "Dockerfile"},
+            "container_name": rname,
+            "volumes": [f"vol_{rname}:/dados", "./grafos:/app/grafos"],
+            "networks": router_nets,
+            "command": (
+                f"python src/roteador.py "
+                f"--meu_ip {router_lan} "
+                f"--lan {' '.join(host_ips)} "
+                f"--wan '{wan_json}'"
+            )
+        }
+        compose["volumes"][f"vol_{rname}"] = {}
+
+        # ---------- hosts --------------------------------------------------
+        for i, hip in enumerate(host_ips, 1):
+            hname = f"host{idx}_{i}"
+            compose["services"][hname] = {
+                "build": {"context": ".", "dockerfile": "Dockerfile"},
+                "container_name": hname,
+                "networks": {lan_name: {"ipv4_address": hip}},
+                "stdin_open": True, "tty": True,
+                "command": f"python src/host.py {hip} {router_lan}"
             }
 
+    # grava
     with open("docker-compose.yml", "w") as f:
         json.dump(compose, f, indent=2)
     print("✔️  docker-compose.yml gerado com sucesso.")
+
+
+
+
 
 
 # ───── Exportar topologia atual ─────
