@@ -146,7 +146,7 @@ def realizar_traceroute(destino_ip, meu_ip, gateway_ip, sock_lan):
         }
         sock_lan.sendto(json.dumps(pacote).encode(), (gateway_ip, 5000))
 
-        tr_sock.settimeout(2)              # aguarda resposta
+        tr_sock.settimeout(5)              # aguarda resposta (timeout aumentado)
         try:
             while True:
                 data, _ = tr_sock.recvfrom(4096)
