@@ -23,7 +23,7 @@ def aguardar_ip_disponivel(ip, porta, tentativas=30):
 # Para salvar graficamente o grafo
 def salvar_grafo(grafo_dinamico, meu_ip, interfaces_locais):
 
-    time.sleep(1)
+    time.sleep(5)
 
     # Agrupa interfaces pelo roteador baseado em conexões internas (peso 0)
     def agrupar_interfaces(grafo):
@@ -362,14 +362,44 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                     destino_final = pacote["entrega_final"]
                     # ▶ Quando o roteador é o destino final
                     if destino_final == minha_iface:
+                        host_origem = pacote["origem"]
+                        reply_port = pacote.get("reply_port", 5000)
+                        
+                        # ── CASO 1 • host está NA MINHA LAN -------------------------------
+                        if host_origem in subrede_local:
+                            resposta = {
+                                "tipo": "traceroute_reply",
+                                "origem": minha_iface,
+                                "destino": host_origem,
+                                "entrega_final": host_origem,
+                                "numero": pacote["numero"],
+                                "ttl": 10
+                            }
+                            print(f"[IF {minha_iface}] Enviando traceroute_reply para host local {host_origem}:{reply_port}")
+                            sock.sendto(json.dumps(resposta).encode(), (host_origem, reply_port))
+                            continue
+                            
+                        # ── CASO 2 • host em outra sub-rede -------------------------------
+                        p0, p1, p2, _ = host_origem.split(".")
+                        gateway_dst = f"{p0}.{p1}.{p2}.1"
+                        
+                        proximo = calcular_proximo_salto(grafo_dinamico, minha_iface, gateway_dst)
+                        if not proximo:
+                            print(f"[IF {minha_iface}] Sem rota p/ {host_origem}")
+                            continue
+                            
                         resposta = {
                             "tipo": "traceroute_reply",
                             "origem": minha_iface,
-                            "numero": pacote["numero"]
+                            "destino": proximo,
+                            "entrega_final": host_origem,
+                            "numero": pacote["numero"],
+                            "reply_port": reply_port,
+                            "ttl": 10
                         }
-                        porta_dest = pacote.get("reply_port", 5000)   # idem
-                        sock.sendto(json.dumps(resposta).encode(),
-                                    (pacote["origem"], porta_dest))
+                        print(f"[IF {minha_iface}] Enviando traceroute_reply via {proximo} para {host_origem}:{reply_port}")
+                        iface_out = vizinho_para_iface.get(proximo, proximo)
+                        sockets[iface_out].sendto(json.dumps(resposta).encode(), (proximo, 5000))
                         continue
 
                     # ▶ Quando TTL chegar a 0  ➜ devolve “ttl_exceeded” ao host de origem
@@ -548,7 +578,15 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                         continue  # já tratamos!
 
                     # ▸ 3. Qualquer outro tráfego local (hosts da própria LAN) ------
-                    porta_alvo = pacote.get("reply_port", 5000)
+                    if tipo in ("traceroute_reply", "ttl_exceeded", "pong"):
+                        # Respostas vão para a porta de resposta especificada
+                        porta_alvo = pacote.get("reply_port", 5000)
+                        print(f"[IF {minha_iface}] Entregando RESPOSTA {tipo} localmente para {entrega_final}:{porta_alvo}")
+                    else:
+                        # Requisições (ping, traceroute, mensagem) vão para a porta padrão 5000
+                        porta_alvo = 5000
+                        print(f"[IF {minha_iface}] Entregando REQUISIÇÃO {tipo} localmente para {entrega_final}:{porta_alvo}")
+                    # Envia para o host local na porta correta
                     sock.sendto(data, (entrega_final, porta_alvo))
                     continue
 
@@ -591,7 +629,22 @@ def escutar_interface(minha_iface, sock, subrede_local, grafo_dinamico, interfac
                 elif proximo in vizinho_para_iface:
                     iface_saida = vizinho_para_iface[proximo]
                     print(f"[IF {minha_iface}] Encaminhando para {proximo} via {iface_saida}")
-                    sockets[iface_saida].sendto(data, (proximo, 5000))
+                    # --- AJUSTE ROTEAMENTO DE RESPOSTA ---
+                    if tipo in ("traceroute_reply", "ttl_exceeded", "pong"):
+                        try:
+                            # Atualiza o destino no pacote para o próximo salto
+                            pacote_mod = json.loads(data.decode()) # Recarrega para ter certeza
+                            pacote_mod["destino"] = proximo
+                            dados_modificados = json.dumps(pacote_mod).encode()
+                            sockets[iface_saida].sendto(dados_modificados, (proximo, 5000))
+                            # print(f"[DEBUG] Pacote {tipo} modificado enviado para {proximo}") # Debug opcional
+                        except Exception as e_inner:
+                             print(f"[WARN] Falha ao modificar pacote {tipo} para {proximo}: {e_inner}. Enviando original.")
+                             sockets[iface_saida].sendto(data, (proximo, 5000)) # Fallback: envia original
+                    else:
+                        # Pacotes de requisição (ping, traceroute, mensagem) são enviados como estão
+                        sockets[iface_saida].sendto(data, (proximo, 5000))
+                    # --- FIM AJUSTE ---
 
                 else:
                     print(f"[IF {minha_iface}] Sem interface conhecida para alcançar {proximo}")
@@ -663,15 +716,15 @@ if __name__ == "__main__":
     ).start()
     
     
-    '''
+    
     # === Salva imagem do grafo após 60 segundos
-   threading.Thread(
+    threading.Thread(
         target=salvar_grafo,
         args=(grafo_dinamico, meu_ip, interfaces_locais),
         daemon=True
     ).start()  
 
-    '''
+    
 
     print(f"\n[Roteador {meu_ip}] Interfaces ativas: {interfaces}")
     print(f"[LAN]: {subrede_local}")
