@@ -1,94 +1,127 @@
-# Telemar Network - Linha do Tempo e Evolução
+# 🛰️ Telemar Network – Simulador de Rede com Roteamento de Estado de Enlace
 
-Este documento apresenta a linha do tempo da evolução da Telemar Network, um simulador de rede em Python com suporte a roteamento dinâmico, detecção de falhas, traceroute, ping e visualização gráfica.
+## 📋 Descrição do Projeto
 
-### 🧠 Fase Conceitual e Protótipo Inicial
+Este projeto consiste em uma simulação completa de uma rede de computadores baseada em roteadores e hosts, com roteamento dinâmico implementado em **Python** e **Docker**.  
+Cada roteador utiliza o **algoritmo de estado de enlace (Link State Routing Algorithm)**, com **troca de LSAs (Link State Advertisements)**, construção de **LSDBs (Link State Database)** e cálculo das rotas com **Dijkstra**.
 
-## ✨ Versão 1.0
+A arquitetura é modular, permitindo simular **topologias personalizadas**, realizar **ping entre hosts**, executar **traceroute** e até simular **ataques DDoS**.
 
-Estrutura inicial com roteadores básicos e algoritmo de Dijkstra.
+---
 
-Cada roteador tinha apenas uma interface.
+## 🛠️ Tecnologias Utilizadas
 
-Comunicacão era feita por portas distintas.
+- **Python 3.12** – Lógica dos roteadores, hosts e simulações.
+- **Docker** – Isolamento de cada roteador e host em containers independentes.
+- **Docker Compose** – Geração dinâmica da infraestrutura da rede.
+- **UDP (User Datagram Protocol)** – Utilizado para a comunicação entre os roteadores.
 
-Topologia pré-definida e estática.
+### 🎯 Justificativa da Escolha do Protocolo (UDP)
 
-### 🧪 Fase de Expansão Estrutural
+Optou-se pelo **UDP** devido à sua **baixa latência** e **simplicidade**, que o tornam ideal para protocolos de roteamento onde:
+- A confiabilidade é gerenciada na camada de aplicação.
+- A velocidade de propagação das informações de estado de enlace é mais importante que a confirmação garantida de entrega.
+- Reduz a sobrecarga de conexão e controle.
 
-## ✨ Versão 2.0
+---
 
-Roteadores com múltiplas interfaces LAN e WAN.
+## 🌐 Como Funciona a Topologia
 
-Suporte a multi-hop e rotação entre interfaces internas.
+A rede é composta por **múltiplas subredes**, cada uma contendo:
+- **2 Hosts**
+- **1 Roteador**
 
-Estrutura de grafo adaptada para representar a nova topologia.
+Os roteadores se interconectam em **topologias configuráveis via arquivos JSON** na pasta `/config`.  
+Exemplos:
+- Topologia em **anel**, **linear**, **losango**, ou **personalizada**.
 
-## ✨ Versão 2.5
+---
 
-Implementação do comando PING com TTL e estatísticas realistas.
+## 🚀 Como Executar o Projeto
 
-Comunicação interna consolidada.
+### 1. Gere a Topologia Desejada
+Escolha um arquivo `.json` da pasta `/config` ou crie o seu seguindo o padrão.
 
-### 🗺️ Fase de Autodescoberta
+### 2. Gere o docker-compose.yml
+```bash
+python launcher.py
+```
 
-## ✨ Versão 3.0
+### 3. Suba a infraestrutura com Docker Compose
+```bash
+docker compose up --build -d
+```
 
-Introdução do protocolo HELLO e troca de LSAs.
+### 4. Interaja com os containers manualmente (opcional)
+```bash
+docker exec -it host1_1 bash
+```
 
-Cada roteador constrói dinamicamente sua visão da rede.
+Ou utilize os **scripts de teste** descritos abaixo para automação.
 
-O grafo é propagado em tempo real com atualizações de topologia.
+---
 
-### ⚙️ Fase Interativa
+## 🧪 Scripts de Teste
 
-## ✨ Versão 4.0
+### ✅ Checklist de Ping Total
+Executa pings entre todos os hosts da topologia, gerando relatórios e gráficos de latência e perda.
 
-Transição para endereçamento IP real (127.X.Y.Z).
+```bash
+python tests/ping_total.py
+```
 
-Porta fixa 5000 para todos os sockets.
+- Os resultados são salvos na pasta:
+  - `/tests/results/`
 
-Simulação realista de subredes IP.
+### 🛡️ Simulador de Ataques DDoS
+Executa um ataque distribuído ao alvo especificado, monitorando o comportamento da rede sob estresse.
 
-## ✨ Versões 4.1 ~ 4.3
+```bash
+python tests/ddos_simulator.py
+```
 
-Consolidação da comunicação baseada em IP.
+- Permite escolher dinamicamente o alvo do ataque (host ou roteador).
 
-Separadas interfaces LAN e WAN corretamente.
+---
 
-Roteamento entre subredes já funcional.
+## 📊 Relatórios e Gráficos
 
-## ✨ Versões 4.4 ~ 4.6
+Ao final de cada teste, os seguintes arquivos são gerados em `/tests/results`:
 
-Implementação do painel de controle CLI.
+- **Arquivo JSON** com os resultados detalhados de cada host.
+- **Gráfico de latência** (`.png`).
+- **Gráfico de perda de pacotes** (`.png`).
 
-Comandos para alterar pesos dinâmicos nas interfaces WAN.
+---
 
-LSAs agora propagam atualizações de peso.
+## 🛰️ Comunicação Entre Hosts
 
-## ✨ Versão 4.7
+✅ Comunicação de **qualquer host para qualquer outro** da rede, mesmo em diferentes roteadores, via roteamento dinâmico.
 
-Adicionada funcionalidade TRACEROUTE completa:
+✅ Suporte a **multihop** com atualizações automáticas de topologia.
 
-Respostas a cada salto
+---
 
-TTL decremental
+## ⚙️ Recursos Implementados
 
-## ✨ Versão 4.8
+- ✅ Roteamento dinâmico com algoritmo de estado de enlace (Dijkstra).
+- ✅ Detecção de falhas com protocolo HELLO.
+- ✅ Propagação de LSAs para toda a rede.
+- ✅ Visualização gráfica da topologia em tempo real.
+- ✅ Comando **PING** com métricas reais de latência e perda.
+- ✅ Comando **TRACEROUTE** simulando saltos e TTL.
+- ✅ **Simulador de DDoS** com monitoramento contínuo.
+- ✅ **Docker Compose** para gerar e isolar topologias completas.
 
-Gráfico redesenhado com visualização por hubs e interfaces orbitais.
+---
 
-Conjuntos de interfaces representadas como pólos de conexão.
+## ⚠️ Observações
 
-Arestas internas com peso 0 agrupam roteadores visualmente.
+- Requer Docker e Docker Compose instalados.
+- Scripts de análise utilizam `matplotlib` e `networkx`.
+- A visualização gráfica não abre janelas interativas, apenas gera arquivos `.png`.
 
-## 🌏 Versão 4.9 Estável: Roteamento Realista
+---
 
-Roteamento entre IPs de subredes iguais (✓)
-
-Hosts de diferentes LANs agora se comunicam corretamente.
-
-TRACEROUTE agora alcança hosts finais.
-
-Grafo atualizado reflete corretamente os roteadores e suas subredes.
-
+## 📝 Histórico
+Consulte o arquivo [`CHANGELOG.md`](CHANGELOG.md) para detalhes da evolução do projeto.
