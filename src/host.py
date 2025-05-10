@@ -52,6 +52,22 @@ def escutar(meu_ip, gateway_ip):
                             "reply_port"   : pacote.get("reply_port", 5000)
                         }
                         sock.sendto(json.dumps(resposta).encode(), (gateway_ip, 5000))
+                # ─────────────────────────────────────────────────────────────
+                elif tipo == "cli_ping":
+                    destino_final = pacote["destino_final"]
+                    reply_addr    = addr
+                    def _task():
+                        stats = realizar_ping(destino_final, meu_ip, gateway_ip, sock,
+                                            retornar_resultado=True, quiet=True)
+                        resposta = {
+                            "tipo": "cli_ping_result",
+                            "origem": meu_ip,
+                            "resultado": stats
+                        }
+                        sock.sendto(json.dumps(resposta).encode(), reply_addr)
+                    threading.Thread(target=_task, daemon=True).start()
+
+                # ─────────────────────────────────────────────────────────────        
 
                 else:
                     print(f"[HOST {meu_ip}] Pacote desconhecido: {pacote}")
@@ -65,8 +81,10 @@ def escutar(meu_ip, gateway_ip):
 
 
 
-def realizar_ping(destino_ip, meu_ip, gateway_ip, sock):
-    print(f"\nDisparando {destino_ip} com 32 bytes de dados:")
+def realizar_ping(destino_ip, meu_ip, gateway_ip, sock,
+                  retornar_resultado=False, quiet=False):
+    if not retornar_resultado:
+        print(f"\nDisparando {destino_ip} com 32 bytes de dados:")
 
     tempos = []
     recebidos = 0
@@ -97,7 +115,8 @@ def realizar_ping(destino_ip, meu_ip, gateway_ip, sock):
                 if ts in pings_ativos and pings_ativos[ts].get("latencia"):
                     return
                 time.sleep(0.05)
-            print(f"Tempo esgotado para o host {destino_ip}.")
+            if not retornar_resultado:
+                print(f"Tempo esgotado para o host {destino_ip}.")
             del pings_ativos[ts]
 
         threading.Thread(target=aguardar_resposta, args=(timestamp,), daemon=True).start()
@@ -116,12 +135,27 @@ def realizar_ping(destino_ip, meu_ip, gateway_ip, sock):
 
     perdidos = total - recebidos
 
-    print(f"\nEstatísticas do Ping para {destino_ip}:")
-    print(f"    Pacotes: Enviados = {total}, Recebidos = {recebidos}, Perdidos = {perdidos} ({int((perdidos/total)*100)}% de perda)")
+    if retornar_resultado:
+        resultado = {
+            "destino": destino_ip,
+            "enviados": total,
+            "recebidos": recebidos,
+            "perdidos": perdidos,
+            "latencias_ms": tempos,
+            "min_ms": min(tempos) if tempos else None,
+            "max_ms": max(tempos) if tempos else None,
+            "media_ms": sum(tempos)//len(tempos) if tempos else None
+        }
+        if not quiet:
+            print(json.dumps(resultado))
+        return resultado
+    else:
+        print(f"\nEstatísticas do Ping para {destino_ip}:")
+        print(f"    Pacotes: Enviados = {total}, Recebidos = {recebidos}, Perdidos = {perdidos} ({int((perdidos/total)*100)}% de perda)")
 
-    if tempos:
-        print("Aproximar um número redondo de vezes em milissegundos:")
-        print(f"    Mínimo = {min(tempos)}ms, Máximo = {max(tempos)}ms, Média = {sum(tempos)//len(tempos)}ms")
+        if tempos:
+            print("Aproximar um número redondo de vezes em milissegundos:")
+            print(f"    Mínimo = {min(tempos)}ms, Máximo = {max(tempos)}ms, Média = {sum(tempos)//len(tempos)}ms")
 
 
         
@@ -207,12 +241,33 @@ def enviar_loop(meu_ip, gateway_ip):
 
 # === Execução principal ===
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Uso: python host.py <meu_ip> <gateway_ip>")
+    if len(sys.argv) < 3:
+        print("Uso: python host.py <meu_ip> <gateway_ip> "
+              "[--cli_ping <destino_ip>]")
         sys.exit(1)
 
-    meu_ip = sys.argv[1]
-    gateway_ip = sys.argv[2]
+    meu_ip, gateway_ip = sys.argv[1], sys.argv[2]
 
-    threading.Thread(target=escutar, args=(meu_ip, gateway_ip), daemon=True).start()
+    # ─── MODO CLI-PING ───────────────────────────────────────────
+    if len(sys.argv) == 5 and sys.argv[3] == "--cli_ping":
+        destino_final = sys.argv[4]
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((meu_ip, 0))            # porta efêmera
+        reply_port = sock.getsockname()[1]
+
+        pedido = {
+            "tipo": "cli_ping",
+            "destino_final": destino_final,
+            "reply_port": reply_port
+        }
+        sock.sendto(json.dumps(pedido).encode(), (meu_ip, 5000))
+        sock.settimeout(10)
+        data, _ = sock.recvfrom(4096)
+        print(data.decode())              # JSON puro
+        sys.exit(0)
+
+    # ─── MODO INTERATIVO (menu) ─────────────────────────────────
+    threading.Thread(target=escutar, args=(meu_ip, gateway_ip),
+                     daemon=True).start()
     enviar_loop(meu_ip, gateway_ip)
