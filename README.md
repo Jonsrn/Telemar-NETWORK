@@ -1,94 +1,47 @@
-# Telemar Network - Linha do Tempo e Evolução
+# 🛰️ Telemar Network – Simulador de Rede com Roteamento de Estado de Enlace
 
-Este documento apresenta a linha do tempo da evolução da Telemar Network, um simulador de rede em Python com suporte a roteamento dinâmico, detecção de falhas, traceroute, ping e visualização gráfica.
+## 📋 Descrição do Projeto
 
-### 🧠 Fase Conceitual e Protótipo Inicial
+Este projeto consiste em uma simulação completa de uma rede de computadores baseada em roteadores e hosts, com roteamento dinâmico implementado em **Python** e **Docker**.  
+Cada roteador utiliza o **algoritmo de estado de enlace (Link State Routing Algorithm)**, com **troca de LSAs (Link State Advertisements)**, construção de **LSDBs (Link State Database)** e cálculo das rotas com **Dijkstra**.
 
-## ✨ Versão 1.0
+A arquitetura é modular, permitindo simular **topologias personalizadas**, realizar **ping entre hosts**, executar **traceroute** e até simular **ataques DDoS**.
 
-Estrutura inicial com roteadores básicos e algoritmo de Dijkstra.
+---
 
-Cada roteador tinha apenas uma interface.
+## 🛠️ Tecnologias Utilizadas
 
-Comunicacão era feita por portas distintas.
+- **Python 3.12** – Lógica dos roteadores, hosts e simulações.
+- **Docker** – Isolamento de cada roteador e host em containers independentes.
+- **Docker Compose** – Geração dinâmica da infraestrutura da rede.
+- **UDP (User Datagram Protocol)** – Utilizado para a comunicação entre os roteadores.
 
-Topologia pré-definida e estática.
+### 🎯 Justificativa da Escolha do Protocolo (UDP)
 
-### 🧪 Fase de Expansão Estrutural
+Optou-se pelo **UDP** devido à sua **baixa latência** e **simplicidade**, que o tornam ideal para protocolos de roteamento onde:
+- A confiabilidade é gerenciada na camada de aplicação.
+- A velocidade de propagação das informações de estado de enlace é mais importante que a confirmação garantida de entrega.
+- Reduz a sobrecarga de conexão e controle.
 
-## ✨ Versão 2.0
+---
 
-Roteadores com múltiplas interfaces LAN e WAN.
+## 🌐 Como Funciona a Topologia
 
-Suporte a multi-hop e rotação entre interfaces internas.
+A rede é composta por **múltiplas subredes**, cada uma contendo:
+- **2 Hosts**
+- **1 Roteador**
 
-Estrutura de grafo adaptada para representar a nova topologia.
+Os roteadores se interconectam em **topologias configuráveis via arquivos JSON** na pasta `/config`.  
+Exemplos:
+- Topologia em **anel**, **linear**, **losango**, ou **personalizada**.
 
-## ✨ Versão 2.5
+---
 
-Implementação do comando PING com TTL e estatísticas realistas.
+## 🚀 Como Executar o Projeto
 
-Comunicação interna consolidada.
+### 1. Gere a Topologia Desejada
+Escolha um arquivo `.json` da pasta `/config` ou crie o seu seguindo o padrão.
 
-### 🗺️ Fase de Autodescoberta
-
-## ✨ Versão 3.0
-
-Introdução do protocolo HELLO e troca de LSAs.
-
-Cada roteador constrói dinamicamente sua visão da rede.
-
-O grafo é propagado em tempo real com atualizações de topologia.
-
-### ⚙️ Fase Interativa
-
-## ✨ Versão 4.0
-
-Transição para endereçamento IP real (127.X.Y.Z).
-
-Porta fixa 5000 para todos os sockets.
-
-Simulação realista de subredes IP.
-
-## ✨ Versões 4.1 ~ 4.3
-
-Consolidação da comunicação baseada em IP.
-
-Separadas interfaces LAN e WAN corretamente.
-
-Roteamento entre subredes já funcional.
-
-## ✨ Versões 4.4 ~ 4.6
-
-Implementação do painel de controle CLI.
-
-Comandos para alterar pesos dinâmicos nas interfaces WAN.
-
-LSAs agora propagam atualizações de peso.
-
-## ✨ Versão 4.7
-
-Adicionada funcionalidade TRACEROUTE completa:
-
-Respostas a cada salto
-
-TTL decremental
-
-## ✨ Versão 4.8
-
-Gráfico redesenhado com visualização por hubs e interfaces orbitais.
-
-Conjuntos de interfaces representadas como pólos de conexão.
-
-Arestas internas com peso 0 agrupam roteadores visualmente.
-
-## 🌏 Versão 4.9 Estável: Roteamento Realista
-
-Roteamento entre IPs de subredes iguais (✓)
-
-Hosts de diferentes LANs agora se comunicam corretamente.
-
-TRACEROUTE agora alcança hosts finais.
-
-Grafo atualizado reflete corretamente os roteadores e suas subredes.
-
+### 2. Gere o docker-compose.yml
+```bash
+python launcher.py
