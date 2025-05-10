@@ -93,6 +93,7 @@ TRACEROUTE agora alcança hosts finais.
 Grafo atualizado reflete corretamente os roteadores e suas subredes.
 
 ### 🐳 Fase Dockerizada e Testes Automatizados
+
 ## ✨ Versão 5.0
 
 Migração completa para Docker, com cada roteador e host executando em containers independentes.
