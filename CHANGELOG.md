@@ -142,6 +142,15 @@ Inicialização e controle centralizado no método start().
 
 Preparação para futuras expansões, facilitando manutenção e evolução da arquitetura.
 
-Adição de Função Nativa no código do Dijkstra. 
+## ✨ Versão 5.3
 
+Substituição do Algoritmo de Dijkstra por Implementação Própria:
+
+-Implementação completa do algoritmo de Dijkstra sem dependência do NetworkX.
+
+-Substituição de todas as chamadas de cálculo de rotas para utilizar a nova implementação.
+
+-Manutenção de todas as funcionalidades existentes (roteamento dinâmico, PING, TRACEROUTE, atualização de pesos).
+
+-Preparação para futuras otimizações e customizações no algoritmo de roteamento.
 
