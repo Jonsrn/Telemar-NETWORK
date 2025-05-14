@@ -118,8 +118,30 @@ Geração de gráficos de latência e perda de pacotes.
 
 Simulador de Ataques DDoS:
 
-Disparo massivo de pings simultâneos simulando ataque distribuído.
+-Disparo massivo de pings simultâneos simulando ataque distribuído.
 
-Monitoramento em tempo real da capacidade da rede sob carga.
+-Monitoramento em tempo real da capacidade da rede sob carga.
 
-Registro dos resultados em arquivos JSON e gráficos no diretório /tests/results.
+-Registro dos resultados em arquivos JSON e gráficos no diretório /tests/results.
+
+## ✨ Versão 5.2
+
+Conversão Completa para Programação Orientada a Objetos (POO):
+
+Host e Roteador reescritos como classes Python com métodos encapsulados.
+
+Lógica e comportamento preservados, garantindo compatibilidade total com as versões anteriores.
+
+Modularização das funcionalidades:
+
+Protocolo HELLO, LSA e Dijkstra encapsulados em métodos.
+
+Processamento de pacotes separado por tipo (CLI, LSA, HELLO, ping, traceroute, etc).
+
+Inicialização e controle centralizado no método start().
+
+Preparação para futuras expansões, facilitando manutenção e evolução da arquitetura.
+
+Adição de Função Nativa no código do Dijkstra. 
+
+

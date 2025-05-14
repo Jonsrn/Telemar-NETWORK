@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import argparse
 import os
 import math
+import heapq
 
 class Roteador:
     @staticmethod
@@ -245,16 +246,92 @@ class Roteador:
                     continue
 
     # === Dijkstra ===
-    def calcular_proximo_salto(self, origem, destino):
-        try:
-            caminho = nx.shortest_path(self.grafo_dinamico, source=origem, target=destino, weight="weight")
-            print(f"[Dijkstra DEBUG] Caminho: {caminho}")
-            if len(caminho) > 1:
-                return caminho[1]
-        except nx.NetworkXNoPath:
-            print(f"[Dijkstra] Sem caminho de {origem} para {destino}")
+    def _dijkstra_customizado(self, origem, destino):
+        # Grafo é self.grafo_dinamico
+        # Nós são strings (IPs)
+        # Pesos estão em self.grafo_dinamico[u][v]['weight']
+
+        if not self.grafo_dinamico.has_node(origem):
+            # print(f"[Dijkstra Custom DEBUG] Nó de origem {origem} não existe no grafo.")
             return None
-        return None
+        if not self.grafo_dinamico.has_node(destino):
+            # print(f"[Dijkstra Custom DEBUG] Nó de destino {destino} não existe no grafo.")
+            return None
+
+        distancias = {node: float('inf') for node in self.grafo_dinamico.nodes()}
+        predecessores = {node: None for node in self.grafo_dinamico.nodes()}
+        distancias[origem] = 0
+
+        # Fila de prioridade armazena (distancia, no)
+        fila_prioridade = [(0, origem)]
+
+        while fila_prioridade:
+            dist_atual, no_atual = heapq.heappop(fila_prioridade)
+
+            # Se já encontramos um caminho menor para no_atual, ignoramos
+            if dist_atual > distancias[no_atual]:
+                continue
+
+            # Se alcançamos o destino, podemos parar e reconstruir o caminho
+            # (Opcional: para Dijkstra padrão, continua até a fila esvaziar para encontrar todos os caminhos mais curtos)
+            # Mas para encontrar UM caminho mais curto para um destino específico, podemos parar aqui.
+            if no_atual == destino:
+                break 
+
+            try:
+                vizinhos_do_no_atual = self.grafo_dinamico.neighbors(no_atual)
+            except nx.NetworkXError: # Caso o nó não esteja no grafo (pouco provável se passou as verificações iniciais)
+                # print(f"[Dijkstra Custom DEBUG] Erro ao obter vizinhos de {no_atual}.")
+                continue
+                
+            for vizinho in vizinhos_do_no_atual:
+                if self.grafo_dinamico.has_edge(no_atual, vizinho):
+                    peso = self.grafo_dinamico[no_atual][vizinho].get("weight", 1) # Default weight 1 se não especificado
+                    distancia_candidata = distancias[no_atual] + peso
+
+                    if distancia_candidata < distancias[vizinho]:
+                        distancias[vizinho] = distancia_candidata
+                        predecessores[vizinho] = no_atual
+                        heapq.heappush(fila_prioridade, (distancia_candidata, vizinho))
+        
+        # Reconstruir o caminho
+        caminho = []
+        passo_atual = destino
+        if distancias[passo_atual] == float('inf'):
+            return None # Destino inalcançável
+
+        while passo_atual is not None:
+            caminho.append(passo_atual)
+            if passo_atual == origem:
+                break
+            passo_atual = predecessores[passo_atual]
+            # Segurança contra loops se algo der muito errado com predecessores
+            if passo_atual is not None and passo_atual in caminho:
+                # print("[Dijkstra Custom DEBUG] Loop detectado na reconstrução do caminho!")
+                return None # Caminho inválido
+        
+        if caminho[-1] == origem: # Verifica se o caminho realmente começa na origem
+            return caminho[::-1]  # Retorna o caminho invertido (origem -> destino)
+        else:
+            return None # Caminho não encontrado ou inválido
+
+
+    def calcular_proximo_salto(self, origem, destino):
+        # Substitui a chamada a nx.shortest_path pela nossa implementação
+        caminho = self._dijkstra_customizado(origem, destino)
+
+        if caminho:
+            print(f"[Dijkstra Custom DEBUG] Caminho: {caminho}") # Mantendo o print de debug original
+            if len(caminho) > 1:
+                return caminho[1] # Retorna o próximo salto
+            elif len(caminho) == 1 and caminho[0] == origem and origem == destino:
+                 # Caso especial: origem é o destino, não há "próximo" salto, mas o caminho é válido.
+                 # A lógica original retornaria None aqui. Para manter consistência:
+                return None 
+        else:
+            print(f"[Dijkstra Custom] Sem caminho de {origem} para {destino}") # Mantendo o print de debug original
+            return None
+        return None # Default return se nenhuma condição acima for atendida
 
     def _monitorar_vizinhos_target(self):
         snapshot_local = set()
