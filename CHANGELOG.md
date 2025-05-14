@@ -142,4 +142,6 @@ Inicialização e controle centralizado no método start().
 
 Preparação para futuras expansões, facilitando manutenção e evolução da arquitetura.
 
+Adição de Função Nativa no código do Dijkstra. 
+
 
