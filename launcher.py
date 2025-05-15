@@ -98,7 +98,7 @@ def gerar_docker_compose() -> None:
             "volumes": [f"vol_{rname}:/dados", "./grafos:/app/grafos"],
             "networks": router_nets,
             "command": (
-                f"python src/roteador.py "
+                f"python -u src/roteador.py "
                 f"--meu_ip {router_lan} "
                 f"--lan {' '.join(host_ips)} "
                 f"--wan '{wan_json}'"
