@@ -46,9 +46,7 @@ class Host:
 
                     # Dentro do método escutar() em host.py
                     elif tipo == "traceroute":
-                        print(f"[HOST {self.meu_ip}] DEBUG: Recebido pacote traceroute: {pacote}") # Log de recebimento
                         if pacote.get("entrega_final") == self.meu_ip:
-                            print(f"[HOST {self.meu_ip}] DEBUG: Sou o destino final do traceroute.") # Log de processamento
                             resposta = {
                                 "tipo": "traceroute_reply",
                                 "origem": self.meu_ip,
@@ -58,7 +56,6 @@ class Host:
                                 "ttl": 10,
                                 "reply_port": pacote.get("reply_port", 5000)
                             }
-                            print(f"[HOST {self.meu_ip}] DEBUG: Enviando traceroute_reply: {resposta} para {(self.gateway_ip, 5000)}") # Log de envio
                             sock.sendto(json.dumps(resposta).encode(), (self.gateway_ip, 5000))
 
 
@@ -240,6 +237,7 @@ if __name__ == "__main__":
     meu_ip, gateway_ip = sys.argv[1], sys.argv[2]
     host = Host(meu_ip, gateway_ip)
 
+    #serve aos scripts de teste
     if len(sys.argv) == 5 and sys.argv[3] == "--cli_ping":
         destino_final = sys.argv[4]
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -256,6 +254,19 @@ if __name__ == "__main__":
         data, _ = sock.recvfrom(4096)
         print(data.decode())
         sys.exit(0)
+    
+    #serve ao painel de controle. 
+    if len(sys.argv) == 5 and sys.argv[3] == "--cli_envia_json":
+        try:
+            cli_pkt = json.loads(sys.argv[4])
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.sendto(json.dumps(cli_pkt).encode(), (gateway_ip, 5000))
+            print("[Host] Pacote CLI encaminhado ao roteador via gateway.")
+        except Exception as e:
+            print(f"[Host] Erro ao processar o pacote CLI: {e}")
+        sys.exit(0)
+    
 
     threading.Thread(target=host.escutar, daemon=True).start()
     host.enviar_loop()
+
