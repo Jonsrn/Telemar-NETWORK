@@ -182,3 +182,5 @@ Adição de logs detalhados do estado do grafo antes de cada cálculo de rota, i
 
 Validação prática do comportamento dinâmico do algoritmo de Dijkstra, confirmando mudanças de rota quando os pesos variam e retorno à rota original após redução dos custos.
 
+Pequena otimização na geração do Compose, resolvendo a mensagem de "version is obsolete" quando se sobe os containers. 
+
