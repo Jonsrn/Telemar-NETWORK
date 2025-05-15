@@ -45,7 +45,7 @@ class Roteador:
 
     # Para salvar graficamente o grafo
     def salvar_grafo(self):
-        time.sleep(5) # Original sleep
+        time.sleep(15) # Original sleep
 
         # Agrupa interfaces pelo roteador baseado em conexões internas (peso 0)
         def agrupar_interfaces(grafo):
@@ -206,8 +206,14 @@ class Roteador:
         vizinhos_recebidos_set = set(vizinhos.keys()) # Renomeado para clareza
         vizinhos_atuais_no_cache = self.topologia_local.get(origem, {}) # Renomeado para clareza
 
-        if vizinhos_atuais_no_cache == vizinhos: # Compara dicts diretamente
-            return
+        if vizinhos_atuais_no_cache == vizinhos:
+            # Mas será que os pesos mudaram? Comparar os pesos um a um
+            pesos_diferentes = any(
+                vizinhos_atuais_no_cache.get(vizinho, None) != peso
+                for vizinho, peso in vizinhos.items()
+            )
+            if not pesos_diferentes:
+                return
 
         # Remove arestas antigas que não existem mais
         for vizinho_antigo in set(vizinhos_atuais_no_cache.keys()):
@@ -400,49 +406,46 @@ class Roteador:
                 try:
                     pacote = json.loads(data.decode())
                     tipo = pacote.get("tipo", "mensagem")
-
+                    
                     # ───── CLI remoto ────────────────────────────────────────────────────────────
                     if tipo == "cli_comando":
+
+                        print(f"[CLI] Recebido comando: {pacote}")
+
                         comando = pacote.get("comando", "").strip().lower()
-                        destino_iface_cli = pacote.get("destino") # Renomeado para evitar conflito
-                        # ip_remetente = addr[0] # quem pediu (não usado no original aqui)
+                        destino_iface_cli = pacote.get("destino", None)
 
                         # 1) RECUPERA GRAFO -------------------------------------------------------
                         if comando == "graph":
-                            self.salvar_grafo() # Usa self.grafo_dinamico, self.meu_ip, self.interfaces_locais
+                            print(f"[CLI] Gerando grafo sob demanda via comando remoto...")
+                            self.salvar_grafo()
                             continue
                         # -------------------------------------------------------------------------
 
-                        # 2) COMANDOS DE PESO ------------------------------------------------------
-                        if destino_iface_cli not in self.interfaces_wan:
-                            print(f"[CLI] Interface {destino_iface_cli} não pertence ao roteador.")
-                            continue
-
-                        if comando == "++++":  # todas as ifaces +1
+                        # 2) AUMENTAR TODOS OS PESOS -----------------------------------------------
+                        if comando == "++++":
+                            print("[CLI] Aumentando peso de todas as interfaces WAN.")
                             for iface_cmd, vizinhos_cmd in self.interfaces_wan.items():
                                 for viz_cmd in vizinhos_cmd:
                                     if self.grafo_dinamico.has_edge(iface_cmd, viz_cmd):
                                         w = self.grafo_dinamico[iface_cmd][viz_cmd].get("weight", 1)
                                         self.grafo_dinamico[iface_cmd][viz_cmd]["weight"] = min(w + 1, 20)
                             self.enviar_lsa()
+                            continue  # Fim do comando "++++"
 
-                        elif comando.startswith(("++", "--")):  # uma iface específica
-                            operacao = comando[:2]  # '++' ou '--'
-                            try:
-                                idx = int(comando[2]) - 1  # 1‑base → 0‑base
-                                iface_alvo = list(self.interfaces_wan.keys())[idx]
-                            except (ValueError, IndexError):
-                                print("[CLI] Índice de interface inválido.")
-                                continue
-
-                            for viz_cmd_target in self.interfaces_wan[iface_alvo]: # Renomeado
-                                if self.grafo_dinamico.has_edge(iface_alvo, viz_cmd_target):
-                                    w = self.grafo_dinamico[iface_alvo][viz_cmd_target].get("weight", 1)
-                                    self.grafo_dinamico[iface_alvo][viz_cmd_target]["weight"] = \
-                                        min(w + 1, 20) if operacao == "++" else max(w - 1, 1)
+                        # 3) REDUZIR TODOS OS PESOS ------------------------------------------------
+                        if comando == "----":
+                            print("[CLI] Reduzindo peso de todas as interfaces WAN.")
+                            for iface_cmd, vizinhos_cmd in self.interfaces_wan.items():
+                                for viz_cmd in vizinhos_cmd:
+                                    if self.grafo_dinamico.has_edge(iface_cmd, viz_cmd):
+                                        w = self.grafo_dinamico[iface_cmd][viz_cmd].get("weight", 1)
+                                        self.grafo_dinamico[iface_cmd][viz_cmd]["weight"] = max(w - 1, 1)
                             self.enviar_lsa()
+                            continue
                         # -------------------------------------------------------------------------
-                        continue  # fim do cli_comando
+                                        
+
                     
                     elif tipo == "traceroute":
                         destino_final = pacote["entrega_final"]
@@ -572,6 +575,8 @@ class Roteador:
 
                     # Demais tipos de pacotes (mensagem, ping, pong, traceroute_reply, ttl_exceeded)
                     destino = pacote["destino"]
+                    #destino = pacote.get("destino")  # <- Evita erro se a chave não existir
+
                     entrega_final = pacote.get("entrega_final", destino)
 
                     if "ttl" in pacote:
