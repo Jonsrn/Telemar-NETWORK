@@ -17,9 +17,12 @@
         },
         "wan_1_1": {
           "ipv4_address": "172.1.1.1"
+        },
+        "wan_1_2": {
+          "ipv4_address": "172.1.2.1"
         }
       },
-      "command": "python -u src/roteador.py --meu_ip 172.101.0.1 --lan 172.101.0.10 172.101.0.11 --wan '{\"172.1.1.1\": [\"172.1.1.2\"]}'"
+      "command": "python -u src/roteador.py --meu_ip 172.101.0.1 --lan 172.101.0.10 172.101.0.11 --wan '{\"172.1.1.1\": [\"172.1.1.2\"], \"172.1.2.1\": [\"172.1.2.2\"]}'"
     },
     "host1_1": {
       "build": {
@@ -120,9 +123,12 @@
         },
         "wan_2_1": {
           "ipv4_address": "172.2.1.2"
+        },
+        "wan_3_1": {
+          "ipv4_address": "172.3.1.1"
         }
       },
-      "command": "python -u src/roteador.py --meu_ip 172.103.0.1 --lan 172.103.0.10 172.103.0.11 --wan '{\"172.2.1.2\": [\"172.2.1.1\"]}'"
+      "command": "python -u src/roteador.py --meu_ip 172.103.0.1 --lan 172.103.0.10 172.103.0.11 --wan '{\"172.2.1.2\": [\"172.2.1.1\"], \"172.3.1.1\": [\"172.3.1.2\"]}'"
     },
     "host3_1": {
       "build": {
@@ -153,6 +159,59 @@
       "stdin_open": true,
       "tty": true,
       "command": "python src/host.py 172.103.0.11 172.103.0.1"
+    },
+    "router4": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "router4",
+      "volumes": [
+        "vol_router4:/dados",
+        "./grafos:/app/grafos"
+      ],
+      "networks": {
+        "lan_4": {
+          "ipv4_address": "172.104.0.1"
+        },
+        "wan_1_2": {
+          "ipv4_address": "172.1.2.2"
+        },
+        "wan_3_1": {
+          "ipv4_address": "172.3.1.2"
+        }
+      },
+      "command": "python -u src/roteador.py --meu_ip 172.104.0.1 --lan 172.104.0.10 172.104.0.11 --wan '{\"172.1.2.2\": [\"172.1.2.1\"], \"172.3.1.2\": [\"172.3.1.1\"]}'"
+    },
+    "host4_1": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host4_1",
+      "networks": {
+        "lan_4": {
+          "ipv4_address": "172.104.0.10"
+        }
+      },
+      "stdin_open": true,
+      "tty": true,
+      "command": "python src/host.py 172.104.0.10 172.104.0.1"
+    },
+    "host4_2": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "container_name": "host4_2",
+      "networks": {
+        "lan_4": {
+          "ipv4_address": "172.104.0.11"
+        }
+      },
+      "stdin_open": true,
+      "tty": true,
+      "command": "python src/host.py 172.104.0.11 172.104.0.1"
     }
   },
   "networks": {
@@ -172,6 +231,16 @@
           {
             "subnet": "172.1.1.0/24",
             "gateway": "172.1.1.254"
+          }
+        ]
+      }
+    },
+    "wan_1_2": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.1.2.0/24",
+            "gateway": "172.1.2.254"
           }
         ]
       }
@@ -205,11 +274,32 @@
           }
         ]
       }
+    },
+    "wan_3_1": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.3.1.0/24",
+            "gateway": "172.3.1.254"
+          }
+        ]
+      }
+    },
+    "lan_4": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "172.104.0.0/24",
+            "gateway": "172.104.0.254"
+          }
+        ]
+      }
     }
   },
   "volumes": {
     "vol_router1": {},
     "vol_router2": {},
-    "vol_router3": {}
+    "vol_router3": {},
+    "vol_router4": {}
   }
 }
