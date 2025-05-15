@@ -154,3 +154,31 @@ Substituição do Algoritmo de Dijkstra por Implementação Própria:
 
 -Preparação para futuras otimizações e customizações no algoritmo de roteamento.
 
+
+## ✨ Versão 5.4
+Integração do Painel de Controle Remoto via Host Docker:
+
+Implementação do painel CLI externo para envio remoto de comandos aos roteadores.
+
+Adição da lógica de roteamento de comandos via hosts intermediários utilizando docker exec.
+
+Processamento de comandos CLI remotos no host, permitindo aumentar ou reduzir pesos e gerar o grafo da topologia.
+
+Validação da funcionalidade de geração de grafo sob demanda (graph) em todos os roteadores.
+
+Registro de logs de recebimento de comandos no host, garantindo rastreabilidade do envio remoto.
+
+## ✨ Versão 5.5
+
+Sincronização de Pesos e Validação de Rotas Dinâmicas:
+
+Implementação dos comandos ++++ (aumentar) e ---- (reduzir) para alterar todos os pesos das interfaces WAN do roteador de forma global.
+
+Sincronização automática da topologia com os vizinhos após cada alteração de peso via LSA.
+
+Correção na lógica de detecção de mudanças em LSAs, garantindo que alterações de peso sejam propagadas mesmo sem alteração estrutural.
+
+Adição de logs detalhados do estado do grafo antes de cada cálculo de rota, incluindo todos os pesos atuais.
+
+Validação prática do comportamento dinâmico do algoritmo de Dijkstra, confirmando mudanças de rota quando os pesos variam e retorno à rota original após redução dos custos.
+
