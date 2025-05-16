@@ -19,7 +19,9 @@ Cada arquivo define:
 
 
 ### 💎 Topologia Losango
-![Topologia Losango](../grafos/grafo_topologia_losango.png)
+
+![grafo_172_101_0_1](https://github.com/user-attachments/assets/8e66b974-3a4d-4a4f-ab12-80cdfa4ac38c)
+
 
 ### 🌐 Topologia Distribuída
 ![Topologia Distribuída](../grafos/grafo_topologia_distribuida.png)
@@ -31,3 +33,17 @@ Cada arquivo define:
 ## ⚠️ Observação
 - Sinta-se livre para **adicionar novas topologias**, seguindo o mesmo formato `.json`.
 - Estes arquivos são **usados apenas no momento da geração** do `docker-compose.yml`.
+
+- ## 🎓 Interpretação das Imagens Geradas
+
+As imagens de topologia geradas pelo simulador representam cada **interface** dos roteadores como **pontos individuais (bolinhas)**.
+
+Essas bolinhas orbitando um mesmo ponto central simulam as **interfaces físicas** de um roteador real, conectadas a diferentes redes.
+
+Essa representação gráfica ilustra como um único roteador pode **administrar múltiplas interfaces** através de seus **barramentos internos**, **encaminhando pacotes entre elas** conforme as rotas calculadas dinamicamente.
+
+> 📌 Exemplo:  
+> Na imagem abaixo, as bolinhas conectadas entre si formam o conjunto de interfaces de um único roteador:
+
+![Exemplo de Roteador com Múltiplas Interfaces](../grafos/grafo_172_101_0_1.png)
+
