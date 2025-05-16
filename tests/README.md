@@ -24,4 +24,32 @@ Cada script tem um propósito específico (conectividade, resiliência, estresse
 ### Execução
 ```bash
 
+```
+
+## 🛡️ `ddos_simulator.py` — Simulador de Ataque DDoS
+
+**Objetivo**
+
+- Submeter um **roteador ou host** a tráfego extremo para analisar gargalos.  
+- Registrar **latência média** durante o ataque.
+
+### Execução
+
+```bash
+python tests/ddos_simulator.py
+
+```
+
+## ⚙️ `painel_controle.py` — Painel CLI de Gerência
+
+**Objetivo**
+
+- Ajustar **pesos das interfaces** de um roteador em tempo real.  
+- Solicitar ao roteador a geração do **grafo** (`grafos/grafo_<ip>.png`).
+
+### Execução
+
+```bash
+python tests/painel_controle.py
+
 
