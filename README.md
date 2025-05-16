@@ -133,3 +133,4 @@ Consulte o arquivo [`CHANGELOG.md`](CHANGELOG.md) para detalhes da evolução do
 - [`/src`](./src) – Código-fonte principal do simulador (hosts e roteadores).
 - [`/config`](./config) – Topologias de rede pré-definidas (formato JSON).
 - [`/tests`](./tests) – Scripts de teste, simulação e análise de desempenho.
+- [`/grafos`](./grafos) – Imagens geradas da topologia da rede em tempo real.
