@@ -25,7 +25,9 @@ Cada arquivo define:
 
 
 ### 🌐 Topologia Distribuída
-![Topologia Distribuída](../grafos/grafo_topologia_distribuida.png)
+
+![grafo_172_102_0_1](https://github.com/user-attachments/assets/1b2c39c7-007b-4afb-96a5-935bcac460dd)
+
 
 ### ⭐ Topologia Estrela
 ![grafo_172_106_0_1](https://github.com/user-attachments/assets/b0e42674-8381-4362-8047-d71bfd1c7038)
@@ -44,7 +46,8 @@ Essas bolinhas orbitando um mesmo ponto central simulam as **interfaces físicas
 Essa representação gráfica ilustra como um único roteador pode **administrar múltiplas interfaces** através de seus **barramentos internos**, **encaminhando pacotes entre elas** conforme as rotas calculadas dinamicamente.
 
 > 📌 Exemplo:  
-> Na imagem abaixo, as bolinhas conectadas entre si formam o conjunto de interfaces de um único roteador:
+> Na imagem abaixo, as bolinhas que estão dentro do mesmo círculo representam os barramentos internos de um mesmo roteador, formando seu conjunto de interfaces:
 
-![Exemplo de Roteador com Múltiplas Interfaces](../grafos/grafo_172_101_0_1.png)
+![Exemplo de Roteador com Múltiplas Interfaces](![image](https://github.com/user-attachments/assets/527058da-852d-446a-9687-82057f1f20d7)
+)
 
