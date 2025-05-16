@@ -14,7 +14,9 @@ Cada arquivo define:
 ![Topologia Circular](../grafos/grafo_topologia_circular.png)
 
 ### ➖ Topologia Linear
-![Topologia Linear](../grafos/grafo_topologia_linear.png)
+
+![grafo_172_102_0_1](https://github.com/user-attachments/assets/918b62b3-dcbc-424a-9152-bc867a445d91)
+
 
 ### 💎 Topologia Losango
 ![Topologia Losango](../grafos/grafo_topologia_losango.png)
