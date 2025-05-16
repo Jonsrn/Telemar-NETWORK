@@ -23,7 +23,8 @@ Cada arquivo define:
 ![Topologia Distribuída](../grafos/grafo_topologia_distribuida.png)
 
 ### ⭐ Topologia Estrela
-![Topologia Estrela](../grafos/grafo_topologia_estrela.png)
+![grafo_172_106_0_1](https://github.com/user-attachments/assets/b0e42674-8381-4362-8047-d71bfd1c7038)
+
 
 ## ⚠️ Observação
 - Sinta-se livre para **adicionar novas topologias**, seguindo o mesmo formato `.json`.
