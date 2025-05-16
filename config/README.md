@@ -48,6 +48,6 @@ Essa representação gráfica ilustra como um único roteador pode **administrar
 > 📌 Exemplo:  
 > Na imagem abaixo, as bolinhas que estão dentro do mesmo círculo representam os barramentos internos de um mesmo roteador, formando seu conjunto de interfaces:
 
-![Exemplo de Roteador com Múltiplas Interfaces](![image](https://github.com/user-attachments/assets/527058da-852d-446a-9687-82057f1f20d7)
-)
+![Captura de tela 2025-05-16 001710](https://github.com/user-attachments/assets/0973769b-53bf-4d44-8478-bcc2657d8868)
+
 
