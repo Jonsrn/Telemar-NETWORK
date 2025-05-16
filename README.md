@@ -33,7 +33,7 @@ A rede é composta por **múltiplas subredes**, cada uma contendo:
 
 Os roteadores se interconectam em **topologias configuráveis via arquivos JSON** na pasta `/config`.  
 Exemplos:
-- Topologia em **anel**, **linear**, **losango**, ou **personalizada**.
+- Topologia em **circular**, **linear**, **losango**, ou **personalizada**.
 
 ---
 
