@@ -11,7 +11,8 @@ Cada arquivo define:
 ## 📐 Exemplos de Topologias
 
 ### 🔄 Topologia Circular
-![Topologia Circular](../grafos/grafo_topologia_circular.png)
+
+![grafo_172_102_0_1](https://github.com/user-attachments/assets/6e9dc248-12db-4850-9aa0-06e11a9b9108)
 
 ### ➖ Topologia Linear
 
