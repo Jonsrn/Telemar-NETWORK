@@ -125,3 +125,11 @@ Ao final de cada teste, os seguintes arquivos são gerados em `/tests/results`:
 
 ## 📝 Histórico
 Consulte o arquivo [`CHANGELOG.md`](CHANGELOG.md) para detalhes da evolução do projeto.
+
+---
+
+## 📂 Leia também
+
+- [`/src`](./src) – Código-fonte principal do simulador (hosts e roteadores).
+- [`/config`](./config) – Topologias de rede pré-definidas (formato JSON).
+- [`/tests`](./tests) – Scripts de teste, simulação e análise de desempenho.
