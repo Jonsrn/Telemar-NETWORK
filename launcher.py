@@ -53,7 +53,7 @@ def gerar_docker_compose() -> None:
         _, b, c, d = ip127.split(".")
         return f"172.{b}.{c}.{d}"
 
-    compose = {"version": "3", "services": {}, "networks": {}, "volumes": {}}
+    compose = {"services": {}, "networks": {}, "volumes": {}}
 
     for idx, rot in enumerate(roteadores, 1):
         # ---------- LAN privada -------------------------------------------

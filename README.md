@@ -33,7 +33,7 @@ A rede é composta por **múltiplas subredes**, cada uma contendo:
 
 Os roteadores se interconectam em **topologias configuráveis via arquivos JSON** na pasta `/config`.  
 Exemplos:
-- Topologia em **anel**, **linear**, **losango**, ou **personalizada**.
+- Topologia em **circular**, **linear**, **losango**, ou **personalizada**.
 
 ---
 
@@ -125,3 +125,12 @@ Ao final de cada teste, os seguintes arquivos são gerados em `/tests/results`:
 
 ## 📝 Histórico
 Consulte o arquivo [`CHANGELOG.md`](CHANGELOG.md) para detalhes da evolução do projeto.
+
+---
+
+## 📂 Leia também
+
+- [`/src`](./src) – Código-fonte principal do simulador (hosts e roteadores).
+- [`/config`](./config) – Topologias de rede pré-definidas (formato JSON).
+- [`/tests`](./tests) – Scripts de teste, simulação e análise de desempenho.
+- [`/grafos`](./grafos) – Imagens geradas da topologia da rede em tempo real.
