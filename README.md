@@ -114,7 +114,7 @@ Ao final de cada teste, os seguintes arquivos são gerados em `/tests/results`:
 
 ✅ Comunicação de **qualquer host para qualquer outro** da rede, mesmo em diferentes roteadores, via roteamento dinâmico.
 
-✅ Suporte a **multihop** com atualizações automáticas de topologia.
+✅ Suporte a comunicação entre hosts que estão em roteadores diferentes, com roteamento dinâmico que atualiza automaticamente a topologia da rede conforme os roteadores trocam informações.
 
 ---
 
