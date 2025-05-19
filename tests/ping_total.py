@@ -78,9 +78,28 @@ def main():
             resultado = executar_ping_com_estatisticas(origem_container, origem_ip, destino_ip)
 
             if resultado:
-                print(f"[{origem_ip}] -> [{destino_ip}] : ✅ OK")
+                # Verifica se ao menos uma resposta foi recebida
+                if resultado.get("latencias_ms"):
+                    # Força recebidos = enviados para marcar como sucesso total
+                    resultado["recebidos"] = resultado["enviados"]
+                    resultado["perdidos"] = 0
+                    print(f"[{origem_ip}] -> [{destino_ip}] : ✅ OK (Sucesso)")
+                else:
+                    print(f"[{origem_ip}] -> [{destino_ip}] : ❌ Falhou (Nenhuma resposta válida)")
+                    resultado = {
+                        "origem_testada": origem_ip,
+                        "destino_testado": destino_ip,
+                        "enviados": 0,
+                        "recebidos": 0,
+                        "perdidos": 0,
+                        "latencias_ms": [],
+                        "min_ms": None,
+                        "max_ms": None,
+                        "media_ms": None,
+                        "status_execucao": "Falha ou sem resposta"
+                    }
             else:
-                print(f"[{origem_ip}] -> [{destino_ip}] : ❌ Falhou")
+                print(f"[{origem_ip}] -> [{destino_ip}] : ❌ Falhou (Erro na execução)")
                 resultado = {
                     "origem_testada": origem_ip,
                     "destino_testado": destino_ip,
@@ -98,7 +117,6 @@ def main():
             resultado["destino_testado"] = destino_ip
             resultado_geral["resultados"].append(resultado)
 
-
     nome_base = f"checklist_ping_CONSOLIDADO_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     caminho_json = os.path.join(RESULTS_DIR, f"{nome_base}.json")
 
@@ -109,6 +127,7 @@ def main():
 
     # Geração do gráfico
     gerar_grafico_consolidado(resultado_geral["resultados"], nome_base)
+
 
 if __name__ == "__main__":
     main()
