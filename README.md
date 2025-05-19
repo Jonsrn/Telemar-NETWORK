@@ -47,10 +47,10 @@ Isso permite a simulação de diferentes cenários, como:
 
 ## 📊 Resumo das Capacidades do Sistema
 
-- ✅ **Limiar de Estresse:** Testado com topologias de **5, 9 e 12 roteadores**. O sistema se mostrou estável, inclusive sob estresse extremo com **17 hosts zumbis atacando simultaneamente** um único roteador central.
+- ✅ **Limiar de Estresse:** Testado com topologias de **3, 6 e 9 roteadores**. O sistema se mostrou estável, inclusive sob estresse extremo com **17 hosts zumbis atacando simultaneamente** um único roteador central.
 - ✅ **Vantagens:** Abordagem modular, comunicação realista via sockets, controle de pesos em tempo real e alta escalabilidade para diferentes topologias.
-- ✅ **Desvantagens:** Consumo crescente de CPU e memória ao simular redes muito grandes em um único host físico.
-- ✅ **Alcance do PING:** Comprovação de que **qualquer host pode alcançar qualquer outro**, mesmo em redes com múltiplos saltos, desde que a topologia esteja devidamente conectada.
+- ✅ **Desvantagens:** Consumo crescente de CPU e memória ao simular redes muito grandes em um hardware limitado.
+- ✅ **Alcance do PING:** Comprovação de que **qualquer host pode alcançar qualquer outro**, mesmo em redes com múltiplos saltos, desde que a topologia esteja devidamente configurada.
 
 
 ## 🚀 Como Executar o Projeto
