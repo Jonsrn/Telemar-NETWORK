@@ -19,9 +19,12 @@ A arquitetura é modular, permitindo simular **topologias personalizadas**, real
 ### 🎯 Justificativa da Escolha do Protocolo (UDP)
 
 Optou-se pelo **UDP** devido à sua **baixa latência** e **simplicidade**, que o tornam ideal para protocolos de roteamento onde:
-- A confiabilidade é gerenciada na camada de aplicação.
-- A velocidade de propagação das informações de estado de enlace é mais importante que a confirmação garantida de entrega.
-- Reduz a sobrecarga de conexão e controle.
+- **Baixa sobrecarga de controle**, ideal para ambientes simulados e cenários de roteamento dinâmico.
+- **Comunicação sem conexão**, permitindo maior desempenho na troca de pacotes de controle (HELLO, LSA, etc.).
+- **Maior escalabilidade e simplicidade**, reduzindo a complexidade da simulação em Docker.
+- A **velocidade** de propagação das informações de estado de enlace é mais importante que a confirmação garantida de entrega.
+- **Reduz a sobrecarga** de conexão e controle.
+
 
 ---
 
@@ -31,11 +34,24 @@ A rede é composta por **múltiplas subredes**, cada uma contendo:
 - **2 Hosts**
 - **1 Roteador**
 
-Os roteadores se interconectam em **topologias configuráveis via arquivos JSON** na pasta `/config`.  
-Exemplos:
-- Topologia em **circular**, **linear**, **losango**, ou **personalizada**.
+As topologias de rede utilizadas neste simulador são **definidas por arquivos JSON** presentes na pasta `/config`.  
+Esses arquivos descrevem:
 
----
+- **As interfaces WAN de cada roteador** e seus **vizinhos diretamente conectados**.
+- A **estrutura lógica da interconexão da rede**.
+
+O launcher do projeto lê esses arquivos e gera automaticamente o `docker-compose.yml`, conectando cada roteador às suas respectivas WANs e LANs.  
+Isso permite a simulação de diferentes cenários, como:
+
+- **Topologias em linha**, **anel**, **estrela**, **distribuída** e **losango**.
+
+## 📊 Resumo das Capacidades do Sistema
+
+- ✅ **Limiar de Estresse:** Testado com topologias de **5, 9 e 12 roteadores**. O sistema se mostrou estável, inclusive sob estresse extremo com **17 hosts zumbis atacando simultaneamente** um único roteador central.
+- ✅ **Vantagens:** Abordagem modular, comunicação realista via sockets, controle de pesos em tempo real e alta escalabilidade para diferentes topologias.
+- ✅ **Desvantagens:** Consumo crescente de CPU e memória ao simular redes muito grandes em um único host físico.
+- ✅ **Alcance do PING:** Comprovação de que **qualquer host pode alcançar qualquer outro**, mesmo em redes com múltiplos saltos, desde que a topologia esteja devidamente conectada.
+
 
 ## 🚀 Como Executar o Projeto
 
